@@ -622,15 +622,15 @@ textarea{resize:vertical;}
     <div id="alert-modal-new">
       <h3>🚨 Acionar Parada / Acidente</h3>
       <div class="label">Seu nome</div>
-      <select id="alert-nome">
-        <option value="">Selecione...</option>
-        <option>LEONARDO</option>
-        <option>FLAVIO</option>
-        <option>MARCELO</option>
-        <option>GEANDRE</option>
-        <option>JOSÉ ADEILSON</option>
-        <option>ALEX SANTANA</option>
-      </select>
+      <input id="alert-nome" list="dl-alert-nome" placeholder="Digite ou selecione..." autocomplete="off">
+      <datalist id="dl-alert-nome">
+        <option value="LEONARDO"></option>
+        <option value="FLAVIO"></option>
+        <option value="MARCELO"></option>
+        <option value="GEANDRE"></option>
+        <option value="JOSÉ ADEILSON"></option>
+        <option value="ALEX SANTANA"></option>
+      </datalist>
       <div class="label">Tipo</div>
       <select id="alert-tipo">
         <option>Parada de Linha</option>
@@ -848,15 +848,15 @@ textarea{resize:vertical;}
       <div class="section-title">🪪 Identificação do Turno</div>
       <div class="row">
         <div class="col"><div class="label">Supervisor</div>
-          <select id="f-supervisor">
-            <option value="">Selecione...</option>
-            <option>LEONARDO</option>
-            <option>FLAVIO</option>
-            <option>MARCELO</option>
-            <option>GEANDRE</option>
-            <option>JOSÉ ADEILSON</option>
-            <option>ALEX SANTANA</option>
-          </select>
+          <input id="f-supervisor" list="dl-f-supervisor" placeholder="Digite ou selecione..." autocomplete="off">
+          <datalist id="dl-f-supervisor">
+            <option value="LEONARDO"></option>
+            <option value="FLAVIO"></option>
+            <option value="MARCELO"></option>
+            <option value="GEANDRE"></option>
+            <option value="JOSÉ ADEILSON"></option>
+            <option value="ALEX SANTANA"></option>
+          </datalist>
         </div>
         <div class="col"><div class="label">Turno</div>
           <select id="f-turno">
@@ -2481,12 +2481,16 @@ async function exportReportPDF(report){
   section("ABSENTEÍSMO");
   const ausentes = report.absenteismo_ausentes || [];
   const absStatus = ausentes.length>0 ? "NOK" : "OK";
+  const ausGestamp = ausentes.filter(a=>a.tipo!=="Terceiro").length;
+  const ausTerceiro = ausentes.filter(a=>a.tipo==="Terceiro").length;
   kv("Status", absStatus);
   kv("Total de ausentes", ausentes.length);
+  kv("Gestamp", ausGestamp);
+  kv("Terceiro", ausTerceiro);
   ausentes.forEach(a=>{
     if(y>272){doc.addPage(); y=18;}
     doc.setFontSize(8); doc.setFont("helvetica","normal"); doc.setTextColor(50,60,80);
-    doc.text(`• ${a.nome||"—"} (${a.tipo==='Terceiro'?'Terceiro':'Gestamp'})`, margin+4, y); y+=5;
+    doc.text(`• ${a.nome||"—"} — Empresa: ${a.tipo==='Terceiro'?'Terceiro':'Gestamp'}`, margin+4, y); y+=5;
   });
 
   section("EXPEDIÇÃO");
@@ -2781,22 +2785,24 @@ function renderCharts(){
     };
   }
 
+  const mpChartData = withTotal(labels, [
+    {label:"Programado", data:sorted.map(r=>Number(r.mp_programado)||0), backgroundColor:C.blue, borderRadius:4},
+    {label:"Realizado", data:sorted.map(r=>Number(r.mp_realizado)||0), backgroundColor:C.green, borderRadius:4}
+  ]);
   chartInstances.mp = new Chart(document.getElementById("chart-mp"), {
     type:"bar",
-    data:{labels, datasets:[
-      {label:"Programado", data:sorted.map(r=>Number(r.mp_programado)||0), backgroundColor:C.blue, borderRadius:4},
-      {label:"Realizado", data:sorted.map(r=>Number(r.mp_realizado)||0), backgroundColor:C.green, borderRadius:4}
-    ]},
+    data:{labels:mpChartData.labels, datasets:mpChartData.datasets},
     options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}},
       scales:{x:gridOpt, y:{...gridOpt, grace:"12%"}}, plugins:{legend:{labels:{font:{size:12}}}}}
   });
 
+  const compChartData = withTotal(labels, [
+    {label:"Programado", data:sorted.map(r=>Number(r.comp_programado)||0), backgroundColor:C.blue, borderRadius:4},
+    {label:"Realizado", data:sorted.map(r=>Number(r.comp_realizado)||0), backgroundColor:C.green, borderRadius:4}
+  ]);
   chartInstances.comp = new Chart(document.getElementById("chart-comp"), {
     type:"bar",
-    data:{labels, datasets:[
-      {label:"Programado", data:sorted.map(r=>Number(r.comp_programado)||0), backgroundColor:C.blue, borderRadius:4},
-      {label:"Realizado", data:sorted.map(r=>Number(r.comp_realizado)||0), backgroundColor:C.green, borderRadius:4}
-    ]},
+    data:{labels:compChartData.labels, datasets:compChartData.datasets},
     options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}},
       scales:{x:gridOpt, y:{...gridOpt, grace:"12%"}}, plugins:{legend:{labels:{font:{size:12}}}}}
   });
