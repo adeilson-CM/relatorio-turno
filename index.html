@@ -621,6 +621,16 @@ textarea{resize:vertical;}
   <div class="alert-modal">
     <div id="alert-modal-new">
       <h3>🚨 Acionar Parada / Acidente</h3>
+      <div class="label">Seu nome</div>
+      <select id="alert-nome">
+        <option value="">Selecione...</option>
+        <option>LEONARDO</option>
+        <option>FLAVIO</option>
+        <option>MARCELO</option>
+        <option>GEANDRE</option>
+        <option>JOSÉ ADEILSON</option>
+        <option>ALEX SANTANA</option>
+      </select>
       <div class="label">Tipo</div>
       <select id="alert-tipo">
         <option>Parada de Linha</option>
@@ -778,7 +788,7 @@ textarea{resize:vertical;}
         <div class="chart-wrap"><canvas id="chart-comp"></canvas></div>
       </div>
       <div class="card chart-card">
-        <div class="chart-title"><span class="chart-title-text">⚠️ IDs com Divergência por Turno</span><button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen(this)" title="Ver em tela cheia">⛶</button></div>
+        <div class="chart-title"><span class="chart-title-text">⚠️ IDs com Divergência por Área</span><button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen(this)" title="Ver em tela cheia">⛶</button></div>
         <div class="chart-wrap"><canvas id="chart-ids"></canvas></div>
       </div>
       <div class="card chart-card">
@@ -837,8 +847,17 @@ textarea{resize:vertical;}
     <div class="card">
       <div class="section-title">🪪 Identificação do Turno</div>
       <div class="row">
-        <div class="col"><div class="label">Supervisor</div><input id="f-supervisor" placeholder="Nome do supervisor"></div>
-        <div class="col"><div class="label">Preenchido por</div><input id="f-preenchido_por" placeholder="Seu nome"></div>
+        <div class="col"><div class="label">Supervisor</div>
+          <select id="f-supervisor">
+            <option value="">Selecione...</option>
+            <option>LEONARDO</option>
+            <option>FLAVIO</option>
+            <option>MARCELO</option>
+            <option>GEANDRE</option>
+            <option>JOSÉ ADEILSON</option>
+            <option>ALEX SANTANA</option>
+          </select>
+        </div>
         <div class="col"><div class="label">Turno</div>
           <select id="f-turno">
             <option>Diurno (06h-18h)</option>
@@ -876,10 +895,23 @@ textarea{resize:vertical;}
 
     <div class="card">
       <div class="section-title">🪪 Controle de IDs</div>
-      <div class="row">
-        <div class="col-narrow"><div class="label">Divergências</div><input id="f-ids_divergencias" type="number" placeholder="0"></div>
-        <div class="col"><div class="label">Observações</div><input id="f-ids_obs" placeholder="Detalhes..."></div>
-      </div>
+      <div class="label" style="margin-bottom:8px;">Divergências por área</div>
+      <div id="ids-areas-container"></div>
+      <button type="button" class="btn btn-light btn-small" onclick="addIdsArea()">+ Adicionar Área</button>
+      <div style="margin-top:12px;font-size:13px;font-weight:800;color:var(--text);">Total: <span id="ids-areas-total">0</span></div>
+      <div class="label" style="margin-top:12px;">Observações</div>
+      <input id="f-ids_obs" placeholder="Detalhes...">
+      <datalist id="ids-area-options">
+        <option value="Controladoria"></option>
+        <option value="Comercial"></option>
+        <option value="Compras"></option>
+        <option value="Engenharia"></option>
+        <option value="Qualidade"></option>
+        <option value="Logística"></option>
+        <option value="Manutenção"></option>
+        <option value="TI"></option>
+        <option value="Produção"></option>
+      </datalist>
     </div>
 
     <div class="card">
@@ -1008,6 +1040,7 @@ textarea{resize:vertical;}
         <div id="d-ids-val" style="font-size:32px;font-weight:800;"></div>
         <div style="font-size:13px;color:var(--muted);">divergências</div>
       </div>
+      <div id="d-ids-areas" style="margin-top:8px;"></div>
       <div id="d-ids-obs" style="font-size:13px;color:var(--muted);margin-top:4px;"></div>
     </div>
 
@@ -1090,7 +1123,7 @@ const emptyForm = () => ({
   data: new Date().toISOString().slice(0,10),
   mp_programado:"", mp_realizado:"", mp_encaixes:"", mp_aguardando:"", mp_obs:"",
   comp_programado:"", comp_realizado:"", comp_obs:"",
-  ids_divergencias:"", ids_obs:"",
+  ids_divergencias:0, ids_por_area:[], ids_obs:"",
   seguranca_status:"OK", seguranca_motivo:"", seguranca_foto:"",
   absenteismo_status:"OK", absenteismo_ausentes:[],
   expedicao_status:"OK", expedicao_obs:"",
@@ -1495,20 +1528,21 @@ function renderForm(){
   }
 
   document.getElementById("f-supervisor").value = form.supervisor;
-  document.getElementById("f-preenchido_por").value = form.preenchido_por;
   document.getElementById("f-turno").value = form.turno;
   document.getElementById("f-data").value = form.data;
   ["mp_programado","mp_realizado","mp_encaixes","mp_aguardando","mp_obs",
    "comp_programado","comp_realizado","comp_obs",
-   "ids_divergencias","ids_obs","expedicao_obs"].forEach(k=>{
+   "ids_obs","expedicao_obs"].forEach(k=>{
     document.getElementById("f-"+k).value = form[k] || "";
   });
   document.getElementById("f-seguranca_motivo").value = form.seguranca_motivo || "";
   if(!form.absenteismo_ausentes) form.absenteismo_ausentes = [];
+  if(!form.ids_por_area) form.ids_por_area = [];
   renderCargas();
   updateExpedicaoAuto();
   renderSeguranca();
   renderAusentes();
+  renderIdsAreas();
   updateAbsenteismoAuto();
   if(!form.celulas) form.celulas = [{nome:"",parada:"NAO",motivo:""}];
   renderCelulas();
@@ -2042,6 +2076,42 @@ function updateAusente(i,key,val){
   if(key==='tipo') renderAusentes();
 }
 
+function renderIdsAreas(){
+  const c = document.getElementById("ids-areas-container");
+  if(!c) return;
+  if(!form.ids_por_area) form.ids_por_area = [];
+  if(form.ids_por_area.length===0){
+    c.innerHTML = '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">Nenhuma área adicionada ainda.</div>';
+  }else{
+    c.innerHTML = "";
+    form.ids_por_area.forEach((a,i)=>{
+      const div = document.createElement("div");
+      div.className = "ausente-row";
+      div.innerHTML = `
+        <div class="col"><input list="ids-area-options" placeholder="Área (ex: Controladoria)" value="${esc(a.area||"")}" onchange="updateIdsArea(${i},'area',this.value)"></div>
+        <div class="col-narrow"><input type="number" placeholder="0" value="${a.qtd===undefined||a.qtd===null?"":a.qtd}" onchange="updateIdsArea(${i},'qtd',this.value)"></div>
+        <button type="button" class="btn btn-danger btn-small" onclick="removeIdsArea(${i})">✕</button>`;
+      c.appendChild(div);
+    });
+  }
+  const total = form.ids_por_area.reduce((s,a)=>s+(Number(a.qtd)||0),0);
+  const totalEl = document.getElementById("ids-areas-total");
+  if(totalEl) totalEl.textContent = total;
+}
+function addIdsArea(){
+  if(!form.ids_por_area) form.ids_por_area = [];
+  form.ids_por_area.push({area:"", qtd:""});
+  renderIdsAreas();
+}
+function removeIdsArea(i){
+  form.ids_por_area.splice(i,1);
+  renderIdsAreas();
+}
+function updateIdsArea(i,key,val){
+  form.ids_por_area[i][key] = val;
+  renderIdsAreas();
+}
+
 function cancelForm(){
   if(editingId === null){
     // Ao cancelar novo relatório, pergunta se quer manter rascunho
@@ -2081,14 +2151,15 @@ function editReport(id){
 async function submitForm(){
   form.supervisor = document.getElementById("f-supervisor").value.trim();
   if(!form.supervisor){ showToast("⚠️ Informe o supervisor"); return; }
-  form.preenchido_por = document.getElementById("f-preenchido_por").value.trim();
   form.turno = document.getElementById("f-turno").value;
   form.data = document.getElementById("f-data").value || new Date().toISOString().slice(0,10);
   ["mp_programado","mp_realizado","mp_encaixes","mp_aguardando","mp_obs",
    "comp_programado","comp_realizado","comp_obs",
-   "ids_divergencias","ids_obs","expedicao_obs"].forEach(k=>{
+   "ids_obs","expedicao_obs"].forEach(k=>{
     form[k] = document.getElementById("f-"+k).value;
   });
+  form.ids_por_area = (form.ids_por_area||[]).filter(a=>(a.area||"").trim() || (Number(a.qtd)||0)>0);
+  form.ids_divergencias = form.ids_por_area.reduce((s,a)=>s+(Number(a.qtd)||0),0);
   form.seguranca_motivo = document.getElementById("f-seguranca_motivo").value.trim();
   if(form.seguranca_status !== "NOK"){ form.seguranca_motivo = ""; form.seguranca_foto = ""; }
   form.item_critico = form.item_critico_status === "SIM" ? document.getElementById("f-item_critico").value.trim() : "";
@@ -2161,9 +2232,14 @@ function renderDetail(){
   ].map(([l,v])=>`<div class="stat-box"><div class="stat-box-label">${l}</div><div class="stat-box-val">${esc(v||"—")}</div></div>`).join("");
   document.getElementById("d-comp-obs").textContent = r.comp_obs || "";
 
+  const idsAreas = r.ids_por_area || [];
+  const idsTotalDetail = idsAreas.length>0 ? idsAreas.reduce((s,a)=>s+(Number(a.qtd)||0),0) : (Number(r.ids_divergencias)||0);
   const idsVal = document.getElementById("d-ids-val");
-  idsVal.textContent = r.ids_divergencias || 0;
-  idsVal.style.color = Number(r.ids_divergencias)>0 ? "var(--amber)" : "var(--green)";
+  idsVal.textContent = idsTotalDetail;
+  idsVal.style.color = idsTotalDetail>0 ? "var(--amber)" : "var(--green)";
+  document.getElementById("d-ids-areas").innerHTML = idsAreas.length>0
+    ? idsAreas.map(a=>`<span class="ausente-chip">${esc(a.area||"—")}: ${esc(String(a.qtd||0))}</span>`).join("")
+    : "";
   document.getElementById("d-ids-obs").textContent = r.ids_obs || "";
 
   const segStatus = r.seguranca_status === "NOK" ? "NOK" : "OK";
@@ -2377,7 +2453,12 @@ async function exportReportPDF(report){
   obs(report.comp_obs);
 
   section("CONTROLE DE IDs");
-  kv("Divergências", report.ids_divergencias || 0);
+  if((report.ids_por_area||[]).length>0){
+    report.ids_por_area.forEach(a=>{ kv(a.area||"Área", a.qtd||0); });
+    kv("Total", report.ids_por_area.reduce((s,a)=>s+(Number(a.qtd)||0),0));
+  }else{
+    kv("Divergências", report.ids_divergencias || 0);
+  }
   obs(report.ids_obs);
 
   section("SEGURANÇA");
@@ -2692,6 +2773,14 @@ function renderCharts(){
   const C = {blue:"#3B7BE8", green:"#0E9F6E", amber:"#D97706", red:"#E02020", muted:"#6B7C93", border:"#D1DCE8"};
   const gridOpt = {grid:{color:C.border}, ticks:{color:"#42536B", font:{size:12}, maxRotation:40, minRotation:0, autoSkip:true, autoSkipPadding:8}};
 
+  // Adiciona uma categoria "Total" ao final do gráfico, somando cada série no período filtrado
+  function withTotal(lbls, datasets){
+    return {
+      labels: [...lbls, "Total"],
+      datasets: datasets.map(ds=>({...ds, data:[...ds.data, ds.data.reduce((s,v)=>s+(Number(v)||0),0)]}))
+    };
+  }
+
   chartInstances.mp = new Chart(document.getElementById("chart-mp"), {
     type:"bar",
     data:{labels, datasets:[
@@ -2712,36 +2801,55 @@ function renderCharts(){
       scales:{x:gridOpt, y:{...gridOpt, grace:"12%"}}, plugins:{legend:{labels:{font:{size:12}}}}}
   });
 
+  // Áreas de divergência de IDs presentes no período filtrado
+  const idsAreasSet = new Set();
+  sorted.forEach(r=>(r.ids_por_area||[]).forEach(a=>{ if(a.area && a.area.trim()) idsAreasSet.add(a.area.trim()); }));
+  const idsAreasList = Array.from(idsAreasSet);
+  const idsPalette = [C.amber, C.blue, C.red, C.green, "#8B5CF6", "#EC4899", "#14B8A6", "#F97316", "#6366F1"];
+  let idsDatasets;
+  if(idsAreasList.length>0){
+    idsDatasets = idsAreasList.map((area, idx)=>({
+      label: area,
+      data: sorted.map(r=>(r.ids_por_area||[]).filter(a=>(a.area||"").trim()===area).reduce((s,a)=>s+(Number(a.qtd)||0),0)),
+      backgroundColor: idsPalette[idx % idsPalette.length], borderRadius:4, stack:"ids"
+    }));
+  }else{
+    idsDatasets = [{label:"Divergências", data: sorted.map(r=>Number(r.ids_divergencias)||0), backgroundColor:C.amber, borderRadius:4, stack:"ids"}];
+  }
+  const idsChartData = withTotal(labels, idsDatasets);
   chartInstances.ids = new Chart(document.getElementById("chart-ids"), {
-    type:"line",
-    data:{labels, datasets:[
-      {label:"Divergências", data:sorted.map(r=>Number(r.ids_divergencias)||0), borderColor:C.amber, backgroundColor:C.amber, tension:.3, pointRadius:4}
-    ]},
-    options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}}, scales:{x:gridOpt, y:gridOpt}, plugins:{legend:{display:false}}}
+    type:"bar",
+    data:{labels:idsChartData.labels, datasets:idsChartData.datasets},
+    options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}},
+      scales:{x:{...gridOpt, stacked:true}, y:{...gridOpt, stacked:true, grace:"12%", ticks:{...gridOpt.ticks, stepSize:1}}},
+      plugins:{legend:{labels:{font:{size:12}}}}}
   });
 
+  const sefazChartData = withTotal(labels, [
+    {label:"Impactos SEFAZ", data:sorted.map(r=>(r.cargas||[]).filter(c=>(c.problema||"").toLowerCase().includes("sefaz")).length), backgroundColor:C.red, borderRadius:4}
+  ]);
   chartInstances.sefaz = new Chart(document.getElementById("chart-sefaz"), {
-    type:"line",
-    data:{labels, datasets:[
-      {label:"Impactos SEFAZ", data:sorted.map(r=>(r.cargas||[]).filter(c=>(c.problema||"").toLowerCase().includes("sefaz")).length), borderColor:C.red, backgroundColor:C.red, tension:.3, pointRadius:4}
-    ]},
-    options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}}, scales:{x:gridOpt, y:gridOpt}, plugins:{legend:{display:false}}}
+    type:"bar",
+    data:{labels:sefazChartData.labels, datasets:sefazChartData.datasets},
+    options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}}, scales:{x:gridOpt, y:{...gridOpt, grace:"12%", ticks:{...gridOpt.ticks, stepSize:1}}}, plugins:{legend:{display:false}}}
   });
 
+  const segurancaChartData = withTotal(labels, [
+    {label:"Segurança NOK", data:sorted.map(r=>r.seguranca_status==="NOK" ? 1 : 0), backgroundColor:C.red, borderRadius:4}
+  ]);
   chartInstances.seguranca = new Chart(document.getElementById("chart-seguranca"), {
-    type:"line",
-    data:{labels, datasets:[
-      {label:"Segurança NOK", data:sorted.map(r=>r.seguranca_status==="NOK" ? 1 : 0), borderColor:C.red, backgroundColor:C.red, tension:.3, pointRadius:4, stepped:true}
-    ]},
-    options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}}, scales:{x:gridOpt, y:{...gridOpt, min:0, max:1, ticks:{...gridOpt.ticks, stepSize:1}}}, plugins:{legend:{display:false}}}
+    type:"bar",
+    data:{labels:segurancaChartData.labels, datasets:segurancaChartData.datasets},
+    options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}}, scales:{x:gridOpt, y:{...gridOpt, grace:"12%", ticks:{...gridOpt.ticks, stepSize:1}}}, plugins:{legend:{display:false}}}
   });
 
+  const absenteismoChartData = withTotal(labels, [
+    {label:"Gestamp", data:sorted.map(r=>(r.absenteismo_ausentes||[]).filter(a=>a.tipo!=="Terceiro").length), backgroundColor:C.blue, borderRadius:4, stack:"abs"},
+    {label:"Terceiro", data:sorted.map(r=>(r.absenteismo_ausentes||[]).filter(a=>a.tipo==="Terceiro").length), backgroundColor:C.amber, borderRadius:4, stack:"abs"}
+  ]);
   chartInstances.absenteismo = new Chart(document.getElementById("chart-absenteismo"), {
     type:"bar",
-    data:{labels, datasets:[
-      {label:"Gestamp", data:sorted.map(r=>(r.absenteismo_ausentes||[]).filter(a=>a.tipo!=="Terceiro").length), backgroundColor:C.blue, borderRadius:4, stack:"abs"},
-      {label:"Terceiro", data:sorted.map(r=>(r.absenteismo_ausentes||[]).filter(a=>a.tipo==="Terceiro").length), backgroundColor:C.amber, borderRadius:4, stack:"abs"}
-    ]},
+    data:{labels:absenteismoChartData.labels, datasets:absenteismoChartData.datasets},
     options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}},
       scales:{x:{...gridOpt, stacked:true}, y:{...gridOpt, stacked:true, grace:"12%", ticks:{...gridOpt.ticks, stepSize:1}}},
       plugins:{legend:{labels:{font:{size:12}}}}}
@@ -2839,15 +2947,17 @@ function renderCharts(){
 
   if(celulaEntries.length > 0){
     const celulaWrap = document.getElementById("chart-celulas-wrap");
-    celulaWrap.style.height = Math.max(260, 46 * celulaEntries.length + 60) + "px";
+    celulaWrap.style.height = Math.max(260, 46 * (celulaEntries.length + 1) + 60) + "px";
 
+    const celulaParadasArr = celulaEntries.map(e=>e[1].paradas);
+    const celulaSemParadaArr = celulaEntries.map(e=>e[1].total - e[1].paradas);
     chartInstances.celulas = new Chart(document.getElementById("chart-celulas"), {
       type:"bar",
       data:{
-        labels: celulaEntries.map(e=>shortLabel(e[0])),
+        labels: [...celulaEntries.map(e=>shortLabel(e[0])), "Total"],
         datasets:[
-          {label:"Paradas", data: celulaEntries.map(e=>e[1].paradas), backgroundColor:C.red, borderRadius:4, fullName: celulaEntries.map(e=>e[0])},
-          {label:"Sem parada", data: celulaEntries.map(e=>e[1].total - e[1].paradas), backgroundColor:C.green, borderRadius:4, fullName: celulaEntries.map(e=>e[0])}
+          {label:"Paradas", data: [...celulaParadasArr, celulaParadasArr.reduce((s,v)=>s+v,0)], backgroundColor:C.red, borderRadius:4, fullName: [...celulaEntries.map(e=>e[0]), "Total"]},
+          {label:"Sem parada", data: [...celulaSemParadaArr, celulaSemParadaArr.reduce((s,v)=>s+v,0)], backgroundColor:C.green, borderRadius:4, fullName: [...celulaEntries.map(e=>e[0]), "Total"]}
         ]
       },
       options:{
@@ -2871,18 +2981,19 @@ function renderCharts(){
     const tempoEntries = celulaEntries.filter(e=>e[1].tempo>0).sort((a,b)=>b[1].tempo-a[1].tempo);
     if(tempoEntries.length > 0){
       const tempoWrap = document.getElementById("chart-celulas-tempo-wrap");
-      tempoWrap.style.height = Math.max(260, 46 * tempoEntries.length + 60) + "px";
+      tempoWrap.style.height = Math.max(260, 46 * (tempoEntries.length + 1) + 60) + "px";
 
+      const tempoValsArr = tempoEntries.map(e=>e[1].tempo);
       chartInstances.celulasTempo = new Chart(document.getElementById("chart-celulas-tempo"), {
         type:"bar",
         data:{
-          labels: tempoEntries.map(e=>shortLabel(e[0])),
+          labels: [...tempoEntries.map(e=>shortLabel(e[0])), "Total"],
           datasets:[{
             label:"Minutos parado",
-            data: tempoEntries.map(e=>e[1].tempo),
-            backgroundColor: tempoEntries.map(e=> e[1].tempo > 60 ? C.red : e[1].tempo > 30 ? C.amber : C.blue),
+            data: [...tempoValsArr, tempoValsArr.reduce((s,v)=>s+v,0)],
+            backgroundColor: [...tempoEntries.map(e=> e[1].tempo > 60 ? C.red : e[1].tempo > 30 ? C.amber : C.blue), C.muted],
             borderRadius:4,
-            fullName: tempoEntries.map(e=>e[0])
+            fullName: [...tempoEntries.map(e=>e[0]), "Total"]
           }]
         },
         options:{
@@ -2980,6 +3091,7 @@ function exportExcel(){
         "Componentes Realizado": r.comp_realizado,
         "Componentes Obs": r.comp_obs,
         "IDs Divergencias": r.ids_divergencias,
+        "IDs Por Area": (r.ids_por_area||[]).map(a=>`${a.area}:${a.qtd}`).join("; "),
         "IDs Obs": r.ids_obs,
         "Seguranca Status": r.seguranca_status === "NOK" ? "NOK" : "OK",
         "Seguranca Motivo": r.seguranca_motivo || "",
@@ -3090,6 +3202,11 @@ async function importExcel(file){
         comp_realizado: row["Componentes Realizado"] ?? "",
         comp_obs: String(row["Componentes Obs"] || ""),
         ids_divergencias: row["IDs Divergencias"] ?? "",
+        ids_por_area: String(row["IDs Por Area"] || "")
+          .split(";").map(s=>s.trim()).filter(Boolean).map(s=>{
+            const parts = s.split(":");
+            return {area: (parts[0]||"").trim(), qtd: Number(parts[1])||0};
+          }),
         ids_obs: String(row["IDs Obs"] || ""),
         seguranca_status: row["Seguranca Status"] === "NOK" ? "NOK" : "OK",
         seguranca_motivo: String(row["Seguranca Motivo"] || ""),
@@ -3253,11 +3370,13 @@ function openAlertModal(){
   document.getElementById("alert-modal-active").classList.toggle("hidden", !active);
   if(active){
     document.getElementById("alert-active-info").innerHTML =
+      `<b>Acionado por:</b> ${active.nome || "—"}<br>` +
       `<b>Tipo:</b> ${active.tipo}<br>` +
       `<b>Local:</b> ${active.local || "—"}<br>` +
       `<b>Descrição:</b> ${active.descricao || "—"}<br>` +
       `<b>Acionado às:</b> ${active.hora}`;
   }else{
+    document.getElementById("alert-nome").value = "";
     document.getElementById("alert-tipo").value = "Parada de Linha";
     document.getElementById("alert-local").value = "";
     document.getElementById("alert-descricao").value = "";
@@ -3270,11 +3389,17 @@ function closeAlertModal(){
 }
 
 function confirmAlert(){
+  const nome = document.getElementById("alert-nome").value.trim();
   const tipo = document.getElementById("alert-tipo").value;
   const local = document.getElementById("alert-local").value.trim();
   const descricao = document.getElementById("alert-descricao").value.trim();
+  if(!nome){
+    showToast("⚠️ Informe seu nome antes de acionar o alerta");
+    document.getElementById("alert-nome").focus();
+    return;
+  }
   const alerta = {
-    tipo, local, descricao,
+    nome, tipo, local, descricao,
     hora: new Date().toLocaleString("pt-BR")
   };
   try{ localStorage.setItem(ALERT_KEY, JSON.stringify(alerta)); }catch(e){}
@@ -3339,7 +3464,7 @@ function renderAlertState(){
     document.getElementById("alert-fab-text").textContent = "Alerta Ativo — Ver detalhes";
     banner.classList.add("show");
     document.getElementById("alert-banner-text").textContent =
-      `${active.tipo}${active.local ? " — " + active.local : ""} (acionado às ${active.hora})`;
+      `${active.tipo}${active.local ? " — " + active.local : ""} — acionado por ${active.nome || "—"} (às ${active.hora})`;
     if(!isAlertMuted()) startAlertSound();
   }else{
     fab.classList.remove("is-active");
