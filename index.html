@@ -777,25 +777,21 @@ textarea{resize:vertical;}
         <div class="chart-title"><span class="chart-title-text">🔩 Componentes: Programado vs Realizado</span><button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen(this)" title="Ver em tela cheia">⛶</button></div>
         <div class="chart-wrap"><canvas id="chart-comp"></canvas></div>
       </div>
-      <div class="charts-grid">
-        <div class="card chart-card">
-          <div class="chart-title"><span class="chart-title-text">⚠️ IDs com Divergência por Turno</span><button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen(this)" title="Ver em tela cheia">⛶</button></div>
-          <div class="chart-wrap-sm"><canvas id="chart-ids"></canvas></div>
-        </div>
-        <div class="card chart-card">
-          <div class="chart-title"><span class="chart-title-text">🖥️ Impactos SEFAZ por Turno</span><button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen(this)" title="Ver em tela cheia">⛶</button></div>
-          <div class="chart-wrap-sm"><canvas id="chart-sefaz"></canvas></div>
-        </div>
+      <div class="card chart-card">
+        <div class="chart-title"><span class="chart-title-text">⚠️ IDs com Divergência por Turno</span><button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen(this)" title="Ver em tela cheia">⛶</button></div>
+        <div class="chart-wrap"><canvas id="chart-ids"></canvas></div>
       </div>
-      <div class="charts-grid">
-        <div class="card chart-card">
-          <div class="chart-title"><span class="chart-title-text">🦺 Segurança — Ocorrências NOK por Turno</span><button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen(this)" title="Ver em tela cheia">⛶</button></div>
-          <div class="chart-wrap-sm"><canvas id="chart-seguranca"></canvas></div>
-        </div>
-        <div class="card chart-card">
-          <div class="chart-title"><span class="chart-title-text">👥 Absenteísmo — Ausentes por Turno</span><button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen(this)" title="Ver em tela cheia">⛶</button></div>
-          <div class="chart-wrap-sm"><canvas id="chart-absenteismo"></canvas></div>
-        </div>
+      <div class="card chart-card">
+        <div class="chart-title"><span class="chart-title-text">🖥️ Impactos SEFAZ por Turno</span><button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen(this)" title="Ver em tela cheia">⛶</button></div>
+        <div class="chart-wrap"><canvas id="chart-sefaz"></canvas></div>
+      </div>
+      <div class="card chart-card">
+        <div class="chart-title"><span class="chart-title-text">🦺 Segurança — Ocorrências NOK por Turno</span><button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen(this)" title="Ver em tela cheia">⛶</button></div>
+        <div class="chart-wrap"><canvas id="chart-seguranca"></canvas></div>
+      </div>
+      <div class="card chart-card">
+        <div class="chart-title"><span class="chart-title-text">👥 Absenteísmo — Ausentes por Turno</span><button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen(this)" title="Ver em tela cheia">⛶</button></div>
+        <div class="chart-wrap"><canvas id="chart-absenteismo"></canvas></div>
       </div>
       <div class="card chart-card">
         <div class="chart-title"><span class="chart-title-text">👥 Absenteísmo — Gestamp x Terceiro (total)</span><button type="button" class="chart-fullscreen-btn" onclick="toggleChartFullscreen(this)" title="Ver em tela cheia">⛶</button></div>
@@ -805,7 +801,13 @@ textarea{resize:vertical;}
         </div>
       </div>
       <div class="card chart-card">
-        <div class="chart-title"><span class="chart-title-text">🏆 Absenteísmo — Ranking por Pessoa</span></div>
+        <div class="chart-title"><span class="chart-title-text">🏆 Absenteísmo — Ranking por Pessoa</span>
+          <select id="filter-ranking-tipo" onchange="renderCharts()" style="font-size:12px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;background:#fff;color:#42536B;">
+            <option value="">Todos</option>
+            <option value="Gestamp">Gestamp</option>
+            <option value="Terceiro">Terceiro</option>
+          </select>
+        </div>
         <div id="absenteismo-ranking-list"></div>
       </div>
       <div class="card chart-card">
@@ -2766,13 +2768,16 @@ function renderCharts(){
     ).join("");
   }
 
+  const rankingTipoFilter = document.getElementById("filter-ranking-tipo") ? document.getElementById("filter-ranking-tipo").value : "";
   const absPorPessoa = {};
   filtered.forEach(r=>(r.absenteismo_ausentes||[]).forEach(a=>{
     const nome = (a.nome||"").trim();
     if(!nome) return;
-    if(!absPorPessoa[nome]) absPorPessoa[nome] = {count:0, tipo:a.tipo||"Gestamp"};
+    const tipo = a.tipo||"Gestamp";
+    if(rankingTipoFilter && tipo!==rankingTipoFilter) return;
+    if(!absPorPessoa[nome]) absPorPessoa[nome] = {count:0, tipo};
     absPorPessoa[nome].count++;
-    absPorPessoa[nome].tipo = a.tipo||"Gestamp";
+    absPorPessoa[nome].tipo = tipo;
   }));
   const rankingArr = Object.entries(absPorPessoa).sort((a,b)=>b[1].count-a[1].count);
   const rankingEl = document.getElementById("absenteismo-ranking-list");
