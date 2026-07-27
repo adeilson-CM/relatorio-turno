@@ -622,15 +622,8 @@ textarea{resize:vertical;}
     <div id="alert-modal-new">
       <h3>🚨 Acionar Parada / Acidente</h3>
       <div class="label">Seu nome</div>
-      <input id="alert-nome" list="dl-alert-nome" placeholder="Digite ou selecione..." autocomplete="off">
-      <datalist id="dl-alert-nome">
-        <option value="LEONARDO"></option>
-        <option value="FLAVIO"></option>
-        <option value="MARCELO"></option>
-        <option value="GEANDRE"></option>
-        <option value="JOSÉ ADEILSON"></option>
-        <option value="ALEX SANTANA"></option>
-      </datalist>
+      <input id="alert-nome" list="dl-alert-nome" placeholder="Digite ou selecione..." autocomplete="off" oninput="onSupervisorInput(this.value)">
+      <datalist id="dl-alert-nome"></datalist>
       <div class="label">Tipo</div>
       <select id="alert-tipo">
         <option>Parada de Linha</option>
@@ -848,24 +841,12 @@ textarea{resize:vertical;}
       <div class="section-title">🪪 Identificação do Turno</div>
       <div class="row">
         <div class="col"><div class="label">Supervisor</div>
-          <input id="f-supervisor" list="dl-f-supervisor" placeholder="Digite ou selecione..." autocomplete="off">
-          <datalist id="dl-f-supervisor">
-            <option value="LEONARDO"></option>
-            <option value="FLAVIO"></option>
-            <option value="MARCELO"></option>
-            <option value="GEANDRE"></option>
-            <option value="JOSÉ ADEILSON"></option>
-            <option value="ALEX SANTANA"></option>
-          </datalist>
+          <input id="f-supervisor" list="dl-f-supervisor" placeholder="Digite ou selecione..." autocomplete="off" oninput="onSupervisorInput(this.value)">
+          <datalist id="dl-f-supervisor"></datalist>
         </div>
         <div class="col"><div class="label">Turno</div>
-          <select id="f-turno">
-            <option>Diurno (06h-18h)</option>
-            <option>Noturno (18h-06h)</option>
-            <option>Turno 1</option>
-            <option>Turno 2</option>
-            <option>Turno 3</option>
-          </select>
+          <select id="f-turno"></select>
+          <button type="button" class="btn btn-light btn-small" style="margin-top:6px;" onclick="addNovoTurno()">➕ Adicionar novo turno</button>
         </div>
         <div class="col-narrow"><div class="label">Data</div><input id="f-data" type="date"></div>
       </div>
@@ -930,6 +911,30 @@ textarea{resize:vertical;}
           <input type="file" id="f-seguranca_foto_input" accept="image/*" style="display:none;" onchange="handleSegurancaFoto(this.files[0])">
         </label>
         <div id="seguranca-foto-preview"></div>
+      </div>
+    </div>
+
+    <div class="card">
+      <div class="section-title">🖥️ Sistemas</div>
+
+      <div class="label">G-Req</div>
+      <div class="status-toggle" style="margin-bottom:12px;">
+        <button type="button" id="f-greq-btn-OK" onclick="setSistemaStatus('greq','OK')">✅ OK</button>
+        <button type="button" id="f-greq-btn-NOK" onclick="setSistemaStatus('greq','NOK')">🚨 NOK</button>
+      </div>
+      <div id="greq-nok-fields" class="hidden" style="margin-bottom:18px;">
+        <div class="label">Motivo</div>
+        <textarea id="f-greq_motivo" rows="2" placeholder="Descreva o que aconteceu..."></textarea>
+      </div>
+
+      <div class="label">G-Prod</div>
+      <div class="status-toggle" style="margin-bottom:12px;">
+        <button type="button" id="f-gprod-btn-OK" onclick="setSistemaStatus('gprod','OK')">✅ OK</button>
+        <button type="button" id="f-gprod-btn-NOK" onclick="setSistemaStatus('gprod','NOK')">🚨 NOK</button>
+      </div>
+      <div id="gprod-nok-fields" class="hidden">
+        <div class="label">Motivo</div>
+        <textarea id="f-gprod_motivo" rows="2" placeholder="Descreva o que aconteceu..."></textarea>
       </div>
     </div>
 
@@ -1052,6 +1057,20 @@ textarea{resize:vertical;}
     </div>
 
     <div class="card">
+      <div class="section-title">🖥️ Sistemas</div>
+      <div style="margin-bottom:10px;">
+        <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:4px;">G-Req</div>
+        <div id="d-greq-badge" style="margin-bottom:4px;"></div>
+        <div id="d-greq-motivo" style="font-size:13px;color:var(--muted);"></div>
+      </div>
+      <div>
+        <div style="font-size:13px;font-weight:700;color:var(--muted);margin-bottom:4px;">G-Prod</div>
+        <div id="d-gprod-badge" style="margin-bottom:4px;"></div>
+        <div id="d-gprod-motivo" style="font-size:13px;color:var(--muted);"></div>
+      </div>
+    </div>
+
+    <div class="card">
       <div class="section-title">👥 Absenteísmo</div>
       <div id="d-absenteismo-badge" style="margin-bottom:8px;"></div>
       <div id="d-absenteismo-list"></div>
@@ -1125,6 +1144,8 @@ const emptyForm = () => ({
   comp_programado:"", comp_realizado:"", comp_obs:"",
   ids_divergencias:0, ids_por_area:[], ids_obs:"",
   seguranca_status:"OK", seguranca_motivo:"", seguranca_foto:"",
+  greq_status:"OK", greq_motivo:"",
+  gprod_status:"OK", gprod_motivo:"",
   absenteismo_status:"OK", absenteismo_ausentes:[],
   expedicao_status:"OK", expedicao_obs:"",
   item_critico_status:"NAO", item_critico:"",
@@ -1417,6 +1438,7 @@ function renderList(){
   }
 
   populateHistoryPreenchidoFilter();
+  populateTurnoFilters();
 
   const searchEl = document.getElementById("search-history");
   const statusEl = document.getElementById("filter-history-status");
@@ -1510,6 +1532,10 @@ function renderForm(){
       if(!form.seguranca_status) form.seguranca_status = "OK";
       if(form.seguranca_motivo === undefined) form.seguranca_motivo = "";
       if(form.seguranca_foto === undefined) form.seguranca_foto = "";
+      if(!form.greq_status) form.greq_status = "OK";
+      if(form.greq_motivo === undefined) form.greq_motivo = "";
+      if(!form.gprod_status) form.gprod_status = "OK";
+      if(form.gprod_motivo === undefined) form.gprod_motivo = "";
       if(!form.absenteismo_ausentes) form.absenteismo_ausentes = [];
       if(!form.item_critico_status) form.item_critico_status = "NAO";
       if(form.item_critico === undefined) form.item_critico = "";
@@ -1527,8 +1553,9 @@ function renderForm(){
     btn.textContent = "💾 Salvar Relatório";
   }
 
+  updatePessoasDatalists();
   document.getElementById("f-supervisor").value = form.supervisor;
-  document.getElementById("f-turno").value = form.turno;
+  renderTurnoSelect(form.turno);
   document.getElementById("f-data").value = form.data;
   ["mp_programado","mp_realizado","mp_encaixes","mp_aguardando","mp_obs",
    "comp_programado","comp_realizado","comp_obs",
@@ -1536,11 +1563,14 @@ function renderForm(){
     document.getElementById("f-"+k).value = form[k] || "";
   });
   document.getElementById("f-seguranca_motivo").value = form.seguranca_motivo || "";
+  document.getElementById("f-greq_motivo").value = form.greq_motivo || "";
+  document.getElementById("f-gprod_motivo").value = form.gprod_motivo || "";
   if(!form.absenteismo_ausentes) form.absenteismo_ausentes = [];
   if(!form.ids_por_area) form.ids_por_area = [];
   renderCargas();
   updateExpedicaoAuto();
   renderSeguranca();
+  renderSistemas();
   renderAusentes();
   renderIdsAreas();
   updateAbsenteismoAuto();
@@ -1690,6 +1720,81 @@ function clearDraft(){
   try{ localStorage.removeItem(DRAFT_KEY); }catch(e){}
 }
 
+// ============ PESSOAS (Supervisor / Acionar Alerta) — lista com histórico ============
+const PESSOAS_KEY = "ops-pessoas-sugestoes";
+const PESSOAS_PADRAO = ["LEONARDO","FLAVIO","MARCELO PORTES","GEANDRE","JOSÉ ADEILSON","ALEX SANTANA"];
+function getPessoasSugestoes(){
+  try{
+    const salvas = JSON.parse(localStorage.getItem(PESSOAS_KEY)||"[]");
+    const merged = [...PESSOAS_PADRAO];
+    salvas.forEach(s=>{ if(!merged.includes(s)) merged.push(s); });
+    return merged;
+  }catch(e){ return PESSOAS_PADRAO; }
+}
+function savePessoaSugestao(nome){
+  if(!nome || !nome.trim()) return;
+  const nomeT = nome.trim();
+  if(PESSOAS_PADRAO.includes(nomeT)) return;
+  const list = (()=>{ try{ return JSON.parse(localStorage.getItem(PESSOAS_KEY)||"[]"); }catch(e){ return []; } })();
+  if(!list.includes(nomeT)){ list.push(nomeT); try{ localStorage.setItem(PESSOAS_KEY, JSON.stringify(list)); }catch(e){} }
+}
+function updatePessoasDatalists(){
+  const opts = getPessoasSugestoes().map(s=>`<option value="${esc(s)}"></option>`).join("");
+  const dlSup = document.getElementById("dl-f-supervisor");
+  if(dlSup) dlSup.innerHTML = opts;
+  const dlAlert = document.getElementById("dl-alert-nome");
+  if(dlAlert) dlAlert.innerHTML = opts;
+}
+function onSupervisorInput(){ /* placeholder: valor é salvo no submit/confirmAlert */ }
+
+// ============ TURNO — lista com histórico (permite adicionar turnos como "ADM") ============
+const TURNOS_KEY = "ops-turnos-sugestoes";
+const TURNOS_PADRAO = ["Diurno (06h-18h)","Noturno (18h-06h)","Turno 1","Turno 2","Turno 3"];
+function getTurnosSugestoes(){
+  try{
+    const salvos = JSON.parse(localStorage.getItem(TURNOS_KEY)||"[]");
+    const merged = [...TURNOS_PADRAO];
+    salvos.forEach(s=>{ if(!merged.includes(s)) merged.push(s); });
+    return merged;
+  }catch(e){ return TURNOS_PADRAO; }
+}
+function saveTurnoSugestao(nome){
+  if(!nome || !nome.trim()) return;
+  const nomeT = nome.trim();
+  if(TURNOS_PADRAO.includes(nomeT)) return;
+  const list = (()=>{ try{ return JSON.parse(localStorage.getItem(TURNOS_KEY)||"[]"); }catch(e){ return []; } })();
+  if(!list.includes(nomeT)){ list.push(nomeT); try{ localStorage.setItem(TURNOS_KEY, JSON.stringify(list)); }catch(e){} }
+}
+// Preenche o <select> de Turno do formulário com os padrões + turnos já adicionados, preservando o valor atual
+function renderTurnoSelect(valorAtual){
+  const sel = document.getElementById("f-turno");
+  if(!sel) return;
+  const atual = valorAtual !== undefined ? valorAtual : sel.value;
+  const lista = getTurnosSugestoes();
+  sel.innerHTML = lista.map(t=>`<option value="${esc(t)}">${esc(t)}</option>`).join("");
+  if(atual && lista.includes(atual)) sel.value = atual;
+}
+function addNovoTurno(){
+  const novo = window.prompt("Digite o nome do novo turno (ex: ADM):");
+  if(novo === null) return;
+  const nomeT = novo.trim();
+  if(!nomeT){ showToast("⚠️ Informe um nome para o turno"); return; }
+  saveTurnoSugestao(nomeT);
+  renderTurnoSelect(nomeT);
+  populateTurnoFilters();
+  showToast(`✅ Turno "${nomeT}" adicionado!`);
+}
+// Preenche os filtros de Turno (Dashboard/Histórico e Gráficos) com os padrões + turnos já usados nos relatórios
+function populateTurnoFilters(){
+  const usados = reports ? Array.from(new Set(reports.map(r=>r.turno).filter(Boolean))) : [];
+  const lista = Array.from(new Set([...getTurnosSugestoes(), ...usados]));
+  const optsHtml = '<option value="">Todos</option>' + lista.map(t=>`<option>${esc(t)}</option>`).join("");
+  const selHist = document.getElementById("filter-history-turno");
+  if(selHist){ const cur = selHist.value; selHist.innerHTML = optsHtml; if(lista.includes(cur)) selHist.value = cur; }
+  const selChart = document.getElementById("filter-turno");
+  if(selChart){ const cur = selChart.value; selChart.innerHTML = optsHtml; if(lista.includes(cur)) selChart.value = cur; }
+}
+
 // ============ CÉLULAS ============
 const CELULAS_KEY = "ops-celulas-sugestoes";
 const MOTIVOS_KEY = "ops-motivos-sugestoes";
@@ -1753,11 +1858,9 @@ function renderCelulas(){
   updateDatalists();
   const c = document.getElementById("celulas-container");
   c.innerHTML = "";
-  const sugestoes = getCelulasSugestoes();
   (form.celulas||[]).forEach((cl,i)=>{
     const div = document.createElement("div");
     div.className = "carga-block";
-    const opts = sugestoes.map(s=>`<option value="${esc(s)}" ${cl.nome===s?'selected':''}>${esc(s)}</option>`).join("");
     div.innerHTML = `
       <div class="carga-header">
         <span class="carga-label">Célula ${i+1}</span>
@@ -1767,16 +1870,14 @@ function renderCelulas(){
       <div class="row">
         <div class="col">
           <div class="label">Nome da Célula / Máquina</div>
-          <div style="display:flex;gap:6px;">
-            <select id="cel-sel-${i}" onchange="onCelulaSelect(${i},this.value)" style="flex:1;">
-              <option value="">-- Selecionar --</option>
-              ${opts}
-              <option value="__novo__">➕ Digitar novo nome...</option>
-            </select>
+          <div class="nome-autocomplete-wrap" id="cel-wrap-${i}">
+            <input id="cel-input-${i}" value="${esc(cl.nome)}" placeholder="🔍 Buscar ou digitar célula/máquina..." autocomplete="off"
+              oninput="celFilter(${i},this.value)"
+              onfocus="celOpen(${i})"
+              onkeydown="celKeydown(event,${i})"
+            >
+            <div class="nome-dropdown" id="cel-drop-${i}"></div>
           </div>
-          <input id="cel-inp-${i}" value="${esc(cl.nome)}" placeholder="Digite o nome da célula"
-            style="margin-top:6px;display:${sugestoes.length===0||cl._novo?'block':'none'};"
-            oninput="updateCelula(${i},'nome',this.value)">
         </div>
         <div class="col-narrow" style="min-width:140px;">
           <div class="label">Parada?</div>
@@ -1806,18 +1907,67 @@ function renderCelulas(){
   if((form.celulas||[]).length===0){
     c.innerHTML = '<div style="font-size:13px;color:var(--muted);margin-bottom:8px;">Nenhuma célula registrada.</div>';
   }
+  // Fechar dropdowns ao clicar fora
+  document.removeEventListener('click', acOutsideClick);
+  document.addEventListener('click', acOutsideClick);
 }
-function onCelulaSelect(i, val){
-  if(val==="__novo__"){
-    form.celulas[i]._novo = true;
-    form.celulas[i].nome = "";
-    renderCelulas();
-    setTimeout(()=>{ const inp = document.getElementById(`cel-inp-${i}`); if(inp){ inp.style.display="block"; inp.focus(); } },50);
-  } else {
-    form.celulas[i]._novo = false;
-    form.celulas[i].nome = val;
-    renderCelulas();
+function celGetFiltered(query){
+  const lista = getCelulasSugestoes();
+  const q = acNormalize(query.trim());
+  if(!q) return lista.slice();
+  return lista.filter(n => acNormalize(n).includes(q));
+}
+function celRenderDropdown(i, query){
+  const drop = document.getElementById("cel-drop-"+i);
+  if(!drop) return;
+  const lista = getCelulasSugestoes();
+  const filtered = celGetFiltered(query);
+  const q = query.trim();
+  let html = "";
+  filtered.forEach(nome => {
+    html += `<div class="nome-dropdown-item" onmousedown="celSelect(${i},'${nome.replace(/'/g,"\\'")}')">` +
+      (q ? nome.replace(new RegExp('('+q.replace(/[.*+?^${}()|[\]\\]/g,'\\$&')+')', 'gi'), '<b>$1</b>') : nome) +
+    `</div>`;
+  });
+  if(q && !lista.some(n => acNormalize(n) === acNormalize(q))){
+    html += `<div class="nome-dropdown-item add-new" onmousedown="celSelect(${i},'${q.replace(/'/g,"\\'")}')">➕ Adicionar: "<b>${esc(q)}</b>"</div>`;
   }
+  if(!html) html = `<div class="nome-dropdown-item" style="color:var(--muted);cursor:default;">Nenhum resultado. Digite para adicionar.</div>`;
+  drop.innerHTML = html;
+}
+function celOpen(i){
+  const input = document.getElementById("cel-input-"+i);
+  const drop = document.getElementById("cel-drop-"+i);
+  if(!drop) return;
+  celRenderDropdown(i, input ? input.value : "");
+  drop.classList.add("open");
+}
+function celFilter(i, val){
+  updateCelula(i, 'nome', val);
+  celRenderDropdown(i, val);
+  const drop = document.getElementById("cel-drop-"+i);
+  if(drop) drop.classList.add("open");
+}
+function celSelect(i, nome){
+  const input = document.getElementById("cel-input-"+i);
+  if(input) input.value = nome;
+  updateCelula(i, 'nome', nome);
+  saveCelulasSugestoes(nome);
+  const drop = document.getElementById("cel-drop-"+i);
+  if(drop) drop.classList.remove("open");
+}
+function celKeydown(e, i){
+  const drop = document.getElementById("cel-drop-"+i);
+  if(!drop || !drop.classList.contains("open")) return;
+  const items = drop.querySelectorAll(".nome-dropdown-item");
+  let idx = -1;
+  items.forEach((el,j)=>{ if(el.classList.contains("focused")) idx = j; });
+  if(e.key === "ArrowDown"){ e.preventDefault(); idx = Math.min(idx+1, items.length-1); }
+  else if(e.key === "ArrowUp"){ e.preventDefault(); idx = Math.max(idx-1, 0); }
+  else if(e.key === "Enter" && idx >= 0){ e.preventDefault(); items[idx].dispatchEvent(new MouseEvent('mousedown')); return; }
+  else if(e.key === "Escape"){ drop.classList.remove("open"); return; }
+  items.forEach((el,j) => el.classList.toggle("focused", j===idx));
+  if(items[idx]) items[idx].scrollIntoView({block:"nearest"});
 }
 function updateCelula(i,key,val){
   form.celulas[i][key] = val;
@@ -1850,6 +2000,26 @@ function updateExpedicaoAuto(){
 }
 
 // ============ SEGURANÇA ============
+function setSistemaStatus(sistema, status){
+  form[sistema+"_status"] = status;
+  if(status==="OK"){
+    form[sistema+"_motivo"] = "";
+    const ta = document.getElementById("f-"+sistema+"_motivo");
+    if(ta) ta.value = "";
+  }
+  renderSistemas();
+}
+function renderSistemas(){
+  ["greq","gprod"].forEach(sistema=>{
+    const status = form[sistema+"_status"] || "OK";
+    const btnOK = document.getElementById("f-"+sistema+"-btn-OK");
+    const btnNOK = document.getElementById("f-"+sistema+"-btn-NOK");
+    if(btnOK) btnOK.className = status==="OK" ? "sel-OK" : "";
+    if(btnNOK) btnNOK.className = status==="NOK" ? "sel-NOK" : "";
+    const fields = document.getElementById(sistema+"-nok-fields");
+    if(fields) fields.classList.toggle("hidden", status!=="NOK");
+  });
+}
 function setSegurancaStatus(status){
   form.seguranca_status = status;
   if(status==="OK"){ form.seguranca_motivo = ""; form.seguranca_foto = ""; document.getElementById("f-seguranca_motivo").value=""; }
@@ -2151,7 +2321,10 @@ function editReport(id){
 async function submitForm(){
   form.supervisor = document.getElementById("f-supervisor").value.trim();
   if(!form.supervisor){ showToast("⚠️ Informe o supervisor"); return; }
-  form.turno = document.getElementById("f-turno").value;
+  savePessoaSugestao(form.supervisor);
+  form.turno = document.getElementById("f-turno").value || "Diurno (06h-18h)";
+  saveTurnoSugestao(form.turno);
+  populateTurnoFilters();
   form.data = document.getElementById("f-data").value || new Date().toISOString().slice(0,10);
   ["mp_programado","mp_realizado","mp_encaixes","mp_aguardando","mp_obs",
    "comp_programado","comp_realizado","comp_obs",
@@ -2162,6 +2335,10 @@ async function submitForm(){
   form.ids_divergencias = form.ids_por_area.reduce((s,a)=>s+(Number(a.qtd)||0),0);
   form.seguranca_motivo = document.getElementById("f-seguranca_motivo").value.trim();
   if(form.seguranca_status !== "NOK"){ form.seguranca_motivo = ""; form.seguranca_foto = ""; }
+  form.greq_motivo = document.getElementById("f-greq_motivo").value.trim();
+  if(form.greq_status !== "NOK"){ form.greq_motivo = ""; }
+  form.gprod_motivo = document.getElementById("f-gprod_motivo").value.trim();
+  if(form.gprod_status !== "NOK"){ form.gprod_motivo = ""; }
   form.item_critico = form.item_critico_status === "SIM" ? document.getElementById("f-item_critico").value.trim() : "";
   // Salva sugestões de células e motivos
   (form.celulas||[]).forEach(cl=>{
@@ -2253,6 +2430,13 @@ function renderDetail(){
     segFoto.src = "";
     segFoto.classList.add("hidden");
   }
+
+  const greqStatus = r.greq_status === "NOK" ? "NOK" : "OK";
+  document.getElementById("d-greq-badge").innerHTML = `<span class="badge badge-${greqStatus}">${greqStatus}</span>`;
+  document.getElementById("d-greq-motivo").textContent = greqStatus==="NOK" ? (r.greq_motivo || "Sem motivo informado.") : "";
+  const gprodStatus = r.gprod_status === "NOK" ? "NOK" : "OK";
+  document.getElementById("d-gprod-badge").innerHTML = `<span class="badge badge-${gprodStatus}">${gprodStatus}</span>`;
+  document.getElementById("d-gprod-motivo").textContent = gprodStatus==="NOK" ? (r.gprod_motivo || "Sem motivo informado.") : "";
 
   const ausentes = r.absenteismo_ausentes || [];
   const absStatus = ausentes.length>0 ? "NOK" : "OK";
@@ -2478,6 +2662,14 @@ async function exportReportPDF(report){
     }
   }
 
+  section("SISTEMAS");
+  const greqStatusPdf = report.greq_status === "NOK" ? "NOK" : "OK";
+  kv("G-Req", greqStatusPdf);
+  if(greqStatusPdf==="NOK") obs(report.greq_motivo);
+  const gprodStatusPdf = report.gprod_status === "NOK" ? "NOK" : "OK";
+  kv("G-Prod", gprodStatusPdf);
+  if(gprodStatusPdf==="NOK") obs(report.gprod_motivo);
+
   section("ABSENTEÍSMO");
   const ausentes = report.absenteismo_ausentes || [];
   const absStatus = ausentes.length>0 ? "NOK" : "OK";
@@ -2672,6 +2864,7 @@ document.addEventListener("webkitfullscreenchange", resizeFullscreenCharts);
 function renderCharts(){
   destroyCharts();
   populatePreenchidoFilter();
+  populateTurnoFilters();
   const filtered = getFilteredReports();
   if(filtered.length===0){
     document.getElementById("charts-empty").classList.remove("hidden");
@@ -2685,7 +2878,7 @@ function renderCharts(){
   document.getElementById("charts-content").classList.remove("hidden");
 
   const sorted = [...filtered].sort((a,b)=>a.data.localeCompare(b.data));
-  const labels = sorted.map(r=>r.data.slice(5) + (r.preenchido_por ? ` (${r.preenchido_por})` : ""));
+  const labels = sorted.map(r=>r.data.slice(5) + (r.supervisor ? ` (${r.supervisor})` : ""));
 
   if(window.Chart){
     Chart.defaults.font.family = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
@@ -2777,11 +2970,29 @@ function renderCharts(){
   const C = {blue:"#3B7BE8", green:"#0E9F6E", amber:"#D97706", red:"#E02020", muted:"#6B7C93", border:"#D1DCE8"};
   const gridOpt = {grid:{color:C.border}, ticks:{color:"#42536B", font:{size:12}, maxRotation:40, minRotation:0, autoSkip:true, autoSkipPadding:8}};
 
-  // Adiciona uma categoria "Total" ao final do gráfico, somando cada série no período filtrado
-  function withTotal(lbls, datasets){
+  // Adiciona uma categoria "Total" ao final do gráfico, somando cada série no período filtrado.
+  // A barra "Total" usa um eixo de valor SECUNDÁRIO e independente (y1/x1), para que a soma
+  // do período não "achate" a escala usada pelas barras diárias.
+  const totalFilter = (item, data) => !((data.datasets[item.datasetIndex] || {})._isTotalSeries);
+  function withTotal(lbls, datasets, opts={}){
+    const axis = opts.axis || "y"; // "y" p/ barras verticais, "x" p/ barras horizontais (indexAxis:"y")
+    const totalAxisId = axis === "y" ? "y1" : "x1";
+    const axisKey = axis + "AxisID";
+    const mainDatasets = datasets.map(ds=>({
+      ...ds,
+      stack: ds.stack || ds.label,
+      data:[...ds.data, null]
+    }));
+    const totalDatasets = datasets.map(ds=>({
+      ...ds,
+      stack: ds.stack || ds.label,
+      [axisKey]: totalAxisId,
+      data:[...ds.data.map(()=>null), ds.data.reduce((s,v)=>s+(Number(v)||0),0)],
+      _isTotalSeries: true
+    }));
     return {
       labels: [...lbls, "Total"],
-      datasets: datasets.map(ds=>({...ds, data:[...ds.data, ds.data.reduce((s,v)=>s+(Number(v)||0),0)]}))
+      datasets: [...mainDatasets, ...totalDatasets]
     };
   }
 
@@ -2793,7 +3004,8 @@ function renderCharts(){
     type:"bar",
     data:{labels:mpChartData.labels, datasets:mpChartData.datasets},
     options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}},
-      scales:{x:gridOpt, y:{...gridOpt, grace:"12%"}}, plugins:{legend:{labels:{font:{size:12}}}}}
+      scales:{x:gridOpt, y:{...gridOpt, grace:"12%"}, y1:{display:false, beginAtZero:true, grace:"12%"}},
+      plugins:{legend:{labels:{font:{size:12}, filter:totalFilter}}}}
   });
 
   const compChartData = withTotal(labels, [
@@ -2804,7 +3016,8 @@ function renderCharts(){
     type:"bar",
     data:{labels:compChartData.labels, datasets:compChartData.datasets},
     options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}},
-      scales:{x:gridOpt, y:{...gridOpt, grace:"12%"}}, plugins:{legend:{labels:{font:{size:12}}}}}
+      scales:{x:gridOpt, y:{...gridOpt, grace:"12%"}, y1:{display:false, beginAtZero:true, grace:"12%"}},
+      plugins:{legend:{labels:{font:{size:12}, filter:totalFilter}}}}
   });
 
   // Áreas de divergência de IDs presentes no período filtrado
@@ -2827,8 +3040,9 @@ function renderCharts(){
     type:"bar",
     data:{labels:idsChartData.labels, datasets:idsChartData.datasets},
     options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}},
-      scales:{x:{...gridOpt, stacked:true}, y:{...gridOpt, stacked:true, grace:"12%", ticks:{...gridOpt.ticks, stepSize:1}}},
-      plugins:{legend:{labels:{font:{size:12}}}}}
+      scales:{x:{...gridOpt, stacked:true}, y:{...gridOpt, stacked:true, grace:"12%", ticks:{...gridOpt.ticks, stepSize:1}},
+        y1:{display:false, stacked:true, beginAtZero:true, grace:"12%"}},
+      plugins:{legend:{labels:{font:{size:12}, filter:totalFilter}}}}
   });
 
   const sefazChartData = withTotal(labels, [
@@ -2837,7 +3051,7 @@ function renderCharts(){
   chartInstances.sefaz = new Chart(document.getElementById("chart-sefaz"), {
     type:"bar",
     data:{labels:sefazChartData.labels, datasets:sefazChartData.datasets},
-    options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}}, scales:{x:gridOpt, y:{...gridOpt, grace:"12%", ticks:{...gridOpt.ticks, stepSize:1}}}, plugins:{legend:{display:false}}}
+    options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}}, scales:{x:gridOpt, y:{...gridOpt, grace:"12%", ticks:{...gridOpt.ticks, stepSize:1}}, y1:{display:false, beginAtZero:true, grace:"12%"}}, plugins:{legend:{display:false}}}
   });
 
   const segurancaChartData = withTotal(labels, [
@@ -2846,7 +3060,7 @@ function renderCharts(){
   chartInstances.seguranca = new Chart(document.getElementById("chart-seguranca"), {
     type:"bar",
     data:{labels:segurancaChartData.labels, datasets:segurancaChartData.datasets},
-    options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}}, scales:{x:gridOpt, y:{...gridOpt, grace:"12%", ticks:{...gridOpt.ticks, stepSize:1}}}, plugins:{legend:{display:false}}}
+    options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}}, scales:{x:gridOpt, y:{...gridOpt, grace:"12%", ticks:{...gridOpt.ticks, stepSize:1}}, y1:{display:false, beginAtZero:true, grace:"12%"}}, plugins:{legend:{display:false}}}
   });
 
   const absenteismoChartData = withTotal(labels, [
@@ -2857,8 +3071,9 @@ function renderCharts(){
     type:"bar",
     data:{labels:absenteismoChartData.labels, datasets:absenteismoChartData.datasets},
     options:{responsive:true, maintainAspectRatio:false, layout:{padding:{top:18}},
-      scales:{x:{...gridOpt, stacked:true}, y:{...gridOpt, stacked:true, grace:"12%", ticks:{...gridOpt.ticks, stepSize:1}}},
-      plugins:{legend:{labels:{font:{size:12}}}}}
+      scales:{x:{...gridOpt, stacked:true}, y:{...gridOpt, stacked:true, grace:"12%", ticks:{...gridOpt.ticks, stepSize:1}},
+        y1:{display:false, stacked:true, beginAtZero:true, grace:"12%"}},
+      plugins:{legend:{labels:{font:{size:12}, filter:totalFilter}}}}
   });
 
   const absCounts = {Gestamp:0, Terceiro:0};
@@ -2957,13 +3172,19 @@ function renderCharts(){
 
     const celulaParadasArr = celulaEntries.map(e=>e[1].paradas);
     const celulaSemParadaArr = celulaEntries.map(e=>e[1].total - e[1].paradas);
+    const celulaParadasTotal = celulaParadasArr.reduce((s,v)=>s+v,0);
+    const celulaSemParadaTotal = celulaSemParadaArr.reduce((s,v)=>s+v,0);
+    const celulaFullNames = [...celulaEntries.map(e=>e[0]), "Total"];
+    // Barra "Total" plotada em um eixo x1 secundário, para não achatar a escala das células.
     chartInstances.celulas = new Chart(document.getElementById("chart-celulas"), {
       type:"bar",
       data:{
         labels: [...celulaEntries.map(e=>shortLabel(e[0])), "Total"],
         datasets:[
-          {label:"Paradas", data: [...celulaParadasArr, celulaParadasArr.reduce((s,v)=>s+v,0)], backgroundColor:C.red, borderRadius:4, fullName: [...celulaEntries.map(e=>e[0]), "Total"]},
-          {label:"Sem parada", data: [...celulaSemParadaArr, celulaSemParadaArr.reduce((s,v)=>s+v,0)], backgroundColor:C.green, borderRadius:4, fullName: [...celulaEntries.map(e=>e[0]), "Total"]}
+          {label:"Paradas", data: [...celulaParadasArr, null], backgroundColor:C.red, borderRadius:4, fullName: celulaFullNames},
+          {label:"Sem parada", data: [...celulaSemParadaArr, null], backgroundColor:C.green, borderRadius:4, fullName: celulaFullNames},
+          {label:"Paradas", data: [...celulaParadasArr.map(()=>null), celulaParadasTotal], backgroundColor:C.red, borderRadius:4, fullName: celulaFullNames, xAxisID:"x1", _isTotalSeries:true},
+          {label:"Sem parada", data: [...celulaSemParadaArr.map(()=>null), celulaSemParadaTotal], backgroundColor:C.green, borderRadius:4, fullName: celulaFullNames, xAxisID:"x1", _isTotalSeries:true}
         ]
       },
       options:{
@@ -2972,10 +3193,11 @@ function renderCharts(){
         layout:{padding:{right:36}},
         scales:{
           x:{...gridOpt, stacked:true, grace:"15%", ticks:{...gridOpt.ticks, stepSize:1, precision:0}},
+          x1:{display:false, stacked:true, beginAtZero:true, grace:"15%"},
           y:{...gridOpt, stacked:true, ticks:{...gridOpt.ticks, font:celulaAxisFont, color:"#1E2A3A", autoSkip:false}}
         },
         plugins:{
-          legend:{labels:{font:{size:12}}},
+          legend:{labels:{font:{size:12}, filter:totalFilter}},
           tooltip:{callbacks:{
             title: ctx => ctx[0]?.dataset?.fullName?.[ctx[0].dataIndex] || ctx[0].label
           }}
@@ -2996,10 +3218,20 @@ function renderCharts(){
           labels: [...tempoEntries.map(e=>shortLabel(e[0])), "Total"],
           datasets:[{
             label:"Minutos parado",
-            data: [...tempoValsArr, tempoValsArr.reduce((s,v)=>s+v,0)],
-            backgroundColor: [...tempoEntries.map(e=> e[1].tempo > 60 ? C.red : e[1].tempo > 30 ? C.amber : C.blue), C.muted],
+            stack:"tempo",
+            data: [...tempoValsArr, null],
+            backgroundColor: [...tempoEntries.map(e=> e[1].tempo > 60 ? C.red : e[1].tempo > 30 ? C.amber : C.blue)],
             borderRadius:4,
             fullName: [...tempoEntries.map(e=>e[0]), "Total"]
+          },{
+            label:"Minutos parado",
+            stack:"tempo",
+            xAxisID:"x1",
+            data: [...tempoValsArr.map(()=>null), tempoValsArr.reduce((s,v)=>s+v,0)],
+            backgroundColor: C.muted,
+            borderRadius:4,
+            fullName: [...tempoEntries.map(e=>e[0]), "Total"],
+            _isTotalSeries:true
           }]
         },
         options:{
@@ -3008,6 +3240,7 @@ function renderCharts(){
           layout:{padding:{right:36}},
           scales:{
             x:{...gridOpt, grace:"15%", ticks:{...gridOpt.ticks, callback:v=>v+"min"}},
+            x1:{display:false, beginAtZero:true, grace:"15%"},
             y:{...gridOpt, ticks:{...gridOpt.ticks, font:celulaAxisFont, color:"#1E2A3A", autoSkip:false}}
           },
           plugins:{
@@ -3102,6 +3335,10 @@ function exportExcel(){
         "Seguranca Status": r.seguranca_status === "NOK" ? "NOK" : "OK",
         "Seguranca Motivo": r.seguranca_motivo || "",
         "Seguranca Tem Foto": r.seguranca_foto ? "Sim" : "Não",
+        "G-Req Status": r.greq_status === "NOK" ? "NOK" : "OK",
+        "G-Req Motivo": r.greq_motivo || "",
+        "G-Prod Status": r.gprod_status === "NOK" ? "NOK" : "OK",
+        "G-Prod Motivo": r.gprod_motivo || "",
         "Absenteismo Status": (r.absenteismo_ausentes||[]).length>0 ? "NOK" : "OK",
         "Absenteismo Qtd": (r.absenteismo_ausentes||[]).length,
         "Absenteismo Lista": (r.absenteismo_ausentes||[]).map(a=>`${a.nome} (${a.tipo==='Terceiro'?'Terceiro':'Gestamp'})`).join("; "),
@@ -3217,6 +3454,10 @@ async function importExcel(file){
         seguranca_status: row["Seguranca Status"] === "NOK" ? "NOK" : "OK",
         seguranca_motivo: String(row["Seguranca Motivo"] || ""),
         seguranca_foto: "",
+        greq_status: row["G-Req Status"] === "NOK" ? "NOK" : "OK",
+        greq_motivo: String(row["G-Req Motivo"] || ""),
+        gprod_status: row["G-Prod Status"] === "NOK" ? "NOK" : "OK",
+        gprod_motivo: String(row["G-Prod Motivo"] || ""),
         absenteismo_ausentes: String(row["Absenteismo Lista"] || "")
           .split(";").map(s=>s.trim()).filter(Boolean).map(s=>{
             const m = s.match(/^(.*)\(([^)]+)\)\s*$/);
@@ -3371,6 +3612,7 @@ function toggleAlertSound(){
 });
 
 function openAlertModal(){
+  updatePessoasDatalists();
   const active = getActiveAlert();
   document.getElementById("alert-modal-new").classList.toggle("hidden", !!active);
   document.getElementById("alert-modal-active").classList.toggle("hidden", !active);
@@ -3404,6 +3646,7 @@ function confirmAlert(){
     document.getElementById("alert-nome").focus();
     return;
   }
+  savePessoaSugestao(nome);
   const alerta = {
     nome, tipo, local, descricao,
     hora: new Date().toLocaleString("pt-BR")
