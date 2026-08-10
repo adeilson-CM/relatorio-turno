@@ -1414,7 +1414,11 @@ function renderNota(){
   if(!notaDataInput.value) notaDataInput.value = todayStr();
   const dataSelecionada = notaDataInput.value;
   const n = state.notas.find(x=>x.data===dataSelecionada);
-  document.getElementById('notaTexto').value = n ? n.texto : '';
+  const notaTextoEl = document.getElementById('notaTexto');
+  const usuarioEstaDigitando = document.activeElement === notaTextoEl;
+  if(!usuarioEstaDigitando){
+    notaTextoEl.value = n ? n.texto : '';
+  }
   document.getElementById('notaMeta').textContent = n ? ('salvo por '+n.atualizado_por+' às '+fmtDateTime(n.updated_at)) : (dataSelecionada===todayStr() ? 'ainda não salvo hoje' : 'nenhuma nota registrada nessa data');
   const preenchidoInput = document.getElementById('notaPreenchidoPor');
   if(!preenchidoInput.value) preenchidoInput.value = state.ultimoPreenchidoPor || '';
