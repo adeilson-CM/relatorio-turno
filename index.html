@@ -944,6 +944,7 @@ const STORAGE_KEY = 'passagem_turno_pcp_cs_v1';
 let state = {
   config: { gasUrl:'https://script.google.com/macros/s/AKfycby9RAaXgGXmF-alEUO46QtBgW8dUakAgSDXNSjhBVLMJCkmN8J9JNCbRSToesxsj4CUbw/exec' },
   ultimoPreenchidoPor: '',
+  rascunhoNota: { data: '', texto: '' },
   turnoAtual: '1º Turno',
   pessoas: BASE_PESSOAS.slice(),
   categorias: BASE_CATEGORIAS.slice(),
@@ -1417,7 +1418,8 @@ function renderNota(){
   const notaTextoEl = document.getElementById('notaTexto');
   const usuarioEstaDigitando = document.activeElement === notaTextoEl;
   if(!usuarioEstaDigitando){
-    notaTextoEl.value = n ? n.texto : '';
+    const temRascunho = state.rascunhoNota && state.rascunhoNota.data === dataSelecionada && state.rascunhoNota.texto;
+    notaTextoEl.value = temRascunho ? state.rascunhoNota.texto : (n ? n.texto : '');
   }
   document.getElementById('notaMeta').textContent = n ? ('salvo por '+n.atualizado_por+' às '+fmtDateTime(n.updated_at)) : (dataSelecionada===todayStr() ? 'ainda não salvo hoje' : 'nenhuma nota registrada nessa data');
   const preenchidoInput = document.getElementById('notaPreenchidoPor');
@@ -1838,10 +1840,16 @@ function bindEvents(){
     n.texto = texto;
     n.atualizado_por = preenchidoPor;
     n.updated_at = nowIso();
+    state.rascunhoNota = { data: '', texto: '' };
     pushNota(n);
     toast('Nota da reunião salva ('+new Date(dataNota+'T00:00:00').toLocaleDateString('pt-BR')+').');
   });
   document.getElementById('notaData').addEventListener('change', renderNota);
+  document.getElementById('notaTexto').addEventListener('input', e=>{
+    const dataAtual = document.getElementById('notaData').value || todayStr();
+    state.rascunhoNota = { data: dataAtual, texto: e.target.value };
+    saveLocal();
+  });
 
   document.getElementById('histDeDiaria').addEventListener('change', ()=>renderHistory('diaria'));
   document.getElementById('histAteDiaria').addEventListener('change', ()=>renderHistory('diaria'));
