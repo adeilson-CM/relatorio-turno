@@ -247,6 +247,20 @@ table.hist-table tr:last-child td{border-bottom:none;}
       </div>
     </div>
 
+    <div class="meeting-notes" style="border-left-color:#8A6DFF;">
+      <h3 style="color:#6a4fd4;">🔄 Passagem de Turno
+        <input type="date" id="passagemData" style="margin-left:auto;font-size:11.5px;padding:4px 8px;border:1px solid var(--border);border-radius:6px;font-weight:400;color:var(--text);">
+      </h3>
+      <textarea id="passagemTexto" placeholder="O que o próximo turno precisa saber ao assumir..."></textarea>
+      <div class="mn-footer">
+        <span id="passagemMeta">ainda não salvo</span>
+        <div style="display:flex;align-items:center;gap:8px;">
+          <input type="text" id="passagemPreenchidoPor" list="dlSupervisores" placeholder="Preenchido por..." style="padding:5px 9px;border:1px solid var(--border);border-radius:6px;font-size:11.5px;width:150px;">
+          <button class="btn blue" id="btnSalvarPassagem" style="padding:5px 12px;font-size:11.5px;background:#6a4fd4;border-color:#6a4fd4;">Salvar passagem</button>
+        </div>
+      </div>
+    </div>
+
     <div class="section-label"><span>Quadro por pessoa</span><button id="btnNovaPessoaDiaria" class="btn" style="padding:3px 10px;font-size:11px;">+ Nova pessoa</button></div>
     <div class="people-grid" id="grid-diaria"></div>
 
@@ -485,6 +499,17 @@ table.hist-table tr:last-child td{border-bottom:none;}
       <button id="btnTvNotaHoje" style="border:1px solid var(--border);background:#fff;border-radius:6px;padding:4px 10px;font-size:11.5px;cursor:pointer;color:var(--muted);">Hoje</button>
     </div>
     <div id="tvNotaConteudo" style="font-size:15px;line-height:1.5;color:var(--text);"></div>
+  </div>
+
+  <div class="tv-panel" id="tvPassagemPanel" style="margin-bottom:22px;">
+    <div style="display:flex;align-items:center;gap:10px;margin-bottom:12px;">
+      <h4 id="tvPassagemTitulo" style="margin-bottom:0;flex:1;">🔄 Passagem de Turno</h4>
+      <button id="btnTvPassagemPrev" style="border:1px solid var(--border);background:#fff;border-radius:6px;padding:4px 10px;font-size:13px;cursor:pointer;color:#6a4fd4;">◀</button>
+      <input type="date" id="tvPassagemDataInput" style="border:1px solid var(--border);border-radius:6px;padding:4px 8px;font-size:12px;">
+      <button id="btnTvPassagemNext" style="border:1px solid var(--border);background:#fff;border-radius:6px;padding:4px 10px;font-size:13px;cursor:pointer;color:#6a4fd4;">▶</button>
+      <button id="btnTvPassagemHoje" style="border:1px solid var(--border);background:#fff;border-radius:6px;padding:4px 10px;font-size:11.5px;cursor:pointer;color:var(--muted);">Hoje</button>
+    </div>
+    <div id="tvPassagemConteudo" style="font-size:15px;line-height:1.5;color:var(--text);"></div>
   </div>
 
   <div class="tv-panel" style="margin-bottom:22px;">
@@ -940,6 +965,7 @@ let state = {
   config: { gasUrl:'https://script.google.com/macros/s/AKfycby9RAaXgGXmF-alEUO46QtBgW8dUakAgSDXNSjhBVLMJCkmN8J9JNCbRSToesxsj4CUbw/exec' },
   ultimoPreenchidoPor: '',
   rascunhoNota: { data: '', texto: '' },
+  rascunhoPassagem: { data: '', texto: '' },
   turnoAtual: '1º Turno',
   pessoas: BASE_PESSOAS.slice(),
   categorias: BASE_CATEGORIAS.slice(),
@@ -948,13 +974,15 @@ let state = {
     turnos: ['1º Turno','2º Turno','3º Turno','2x2x3 dia','2x2x3 noite']
   },
   tasks: [],   // {id,aba,pessoa,categoria,descricao,turno_abertura,aberto_por,data_abertura,prazo_fechamento,status,turno_fechamento,fechado_por,data_fechamento,observacao_fechamento,updated_at}
-  notas: []    // {data,texto,atualizado_por,updated_at}
+  notas: [],   // {data,texto,atualizado_por,updated_at}
+  passagens: [] // {data,texto,atualizado_por,updated_at}
 };
 let currentTab = 'diaria';
 let tvInterval = null;
 let chartCategoria=null;
 let tvSelectedPerson=null;
 let tvNotaData=null;
+let tvPassagemData=null;
 
 /* ---------------- Persistência local ---------------- */
 const BASE_TURNOS = ['1º Turno','2º Turno','3º Turno','2x2x3 dia','2x2x3 noite'];
@@ -1035,6 +1063,7 @@ async function gasCall(payload){
   params.set('_', bust);
   if(payload.action === 'upsert_task') params.set('payload', JSON.stringify(payload.task));
   else if(payload.action === 'upsert_nota') params.set('payload', JSON.stringify(payload.nota));
+  else if(payload.action === 'upsert_passagem') params.set('payload', JSON.stringify(payload.passagem));
   else if(payload.action === 'delete_task') params.set('id', payload.id);
   else if(payload.action === 'upsert_config'){ params.set('chave', payload.chave); params.set('valor', JSON.stringify(payload.valor)); }
 
@@ -1089,6 +1118,7 @@ async function syncNow(showToast){
     const remote = await gasFetchAll();
     state.tasks = mergeById(state.tasks, remote.tasks||[], 'id');
     state.notas = mergeById(state.notas, remote.notas||[], 'data');
+    state.passagens = mergeById(state.passagens, remote.passagem||[], 'data');
     if(remote.config){
       // Pessoas agora pode ser removida, então a lista do servidor é a fonte da
       // verdade (substitui a local) sempre que já existir algo publicado —
@@ -1132,6 +1162,18 @@ async function pushNota(nota){
     setSyncStatus('ok','sincronizado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
   }catch(e){
     console.error('Falha ao enviar nota:', e);
+    setSyncStatus('err','falha ao enviar: '+e.message);
+  }
+}
+
+async function pushPassagem(passagem){
+  saveLocal(); renderAll();
+  if(!state.config.gasUrl) return;
+  try{
+    await gasCall({action:'upsert_passagem', passagem});
+    setSyncStatus('ok','sincronizado às '+new Date().toLocaleTimeString('pt-BR',{hour:'2-digit',minute:'2-digit'}));
+  }catch(e){
+    console.error('Falha ao enviar passagem:', e);
     setSyncStatus('err','falha ao enviar: '+e.message);
   }
 }
@@ -1427,6 +1469,7 @@ function personCardHtml(pessoa, aba){
       <span class="person-name">${escapeHtml(pessoa)}</span>
       <span style="display:flex;align-items:center;gap:6px;">
         <span class="person-badge ${badgeClass}">${open.length} aberta${open.length===1?'':'s'}</span>
+        <button class="remove-person-btn" title="Gerar PDF só desta pessoa" onclick="event.stopPropagation();PT.gerarPdfPessoa('${escapeHtml(pessoa)}')">🖶</button>
         <button class="remove-person-btn" title="Excluir pessoa" onclick="PT.removerPessoa('${escapeHtml(pessoa)}')">✕</button>
       </span>
     </div>
@@ -1495,10 +1538,27 @@ function renderNota(){
   if(!preenchidoInput.value) preenchidoInput.value = state.ultimoPreenchidoPor || '';
 }
 
+function renderPassagem(){
+  const dataInput = document.getElementById('passagemData');
+  if(!dataInput.value) dataInput.value = todayStr();
+  const dataSelecionada = dataInput.value;
+  const p = state.passagens.find(x=>x.data===dataSelecionada);
+  const textoEl = document.getElementById('passagemTexto');
+  const usuarioEstaDigitando = document.activeElement === textoEl;
+  if(!usuarioEstaDigitando){
+    const temRascunho = state.rascunhoPassagem && state.rascunhoPassagem.data === dataSelecionada && state.rascunhoPassagem.texto;
+    textoEl.value = temRascunho ? state.rascunhoPassagem.texto : (p ? p.texto : '');
+  }
+  document.getElementById('passagemMeta').textContent = p ? ('salvo por '+p.atualizado_por+' às '+fmtDateTime(p.updated_at)) : (dataSelecionada===todayStr() ? 'ainda não salvo hoje' : 'nenhuma passagem registrada nessa data');
+  const preenchidoInput = document.getElementById('passagemPreenchidoPor');
+  if(!preenchidoInput.value) preenchidoInput.value = state.ultimoPreenchidoPor || '';
+}
+
 function renderAll(){
   renderGrid('diaria');
   renderHistory('diaria');
   renderNota();
+  renderPassagem();
 }
 
 /* ---------------- Edição de histórico ---------------- */
@@ -1657,6 +1717,21 @@ function renderTv(){
     notaEl.innerHTML = `<span style="color:var(--muted);font-style:italic;">Nenhuma nota registrada ${ehHoje?'para hoje':'nessa data'}.</span>`;
   }
 
+  if(!tvPassagemData) tvPassagemData = todayStr();
+  const passagemDataInputEl = document.getElementById('tvPassagemDataInput');
+  if(passagemDataInputEl.value !== tvPassagemData) passagemDataInputEl.value = tvPassagemData;
+  const passagemDoDia = state.passagens.find(p=>p.data===tvPassagemData);
+  const passagemEl = document.getElementById('tvPassagemConteudo');
+  const dataBrPassagem = new Date(tvPassagemData+'T00:00:00').toLocaleDateString('pt-BR', {weekday:'short', day:'2-digit', month:'2-digit', year:'numeric'});
+  const ehHojePassagem = tvPassagemData === todayStr();
+  document.getElementById('tvPassagemTitulo').innerHTML = `🔄 Passagem de Turno <span style="font-size:12px;font-weight:400;color:var(--muted);text-transform:none;letter-spacing:0;">— ${dataBrPassagem}${ehHojePassagem?' (hoje)':''}</span>`;
+  if(passagemDoDia && passagemDoDia.texto && passagemDoDia.texto.trim()){
+    passagemEl.innerHTML = escapeHtml(passagemDoDia.texto).replace(/\n/g,'<br>') +
+      `<div style="margin-top:8px;font-size:11.5px;color:var(--muted);">Preenchido por ${escapeHtml(passagemDoDia.atualizado_por||'—')} às ${fmtDateTime(passagemDoDia.updated_at)}</div>`;
+  }else{
+    passagemEl.innerHTML = `<span style="color:var(--muted);font-style:italic;">Nenhuma passagem registrada ${ehHojePassagem?'para hoje':'nessa data'}.</span>`;
+  }
+
   const filtroTxt = tvSelectedPerson ? ` — filtrando: <strong>${escapeHtml(tvSelectedPerson)}</strong> <button onclick="PT.tvSelectPerson('${escapeHtml(tvSelectedPerson)}')" style="margin-left:8px;border:1px solid var(--border);background:#fff;border-radius:6px;padding:2px 8px;font-size:10.5px;cursor:pointer;color:var(--muted);">✕ limpar</button>` : '';
   document.getElementById('tvPeopleTitle').innerHTML = '👥 Quadro por pessoa — clique num nome para detalhar'+filtroTxt;
   document.getElementById('tvCategoriaTitle').innerHTML = 'Tarefas abertas por categoria'+filtroTxt;
@@ -1748,6 +1823,7 @@ function tvSelectPerson(pessoa){
 function enterTv(){
   tvSelectedPerson = null;
   tvNotaData = todayStr();
+  tvPassagemData = todayStr();
   document.getElementById('tvOverlay').classList.add('show');
   renderTv();
   tvInterval = setInterval(()=>{ syncNow(false); renderTv(); }, 20000);
@@ -1769,9 +1845,22 @@ function tvNotaHoje(){
 function tvNotaDefinirData(valor){
   if(valor){ tvNotaData = valor; renderTv(); }
 }
+function tvPassagemMudarDia(delta){
+  const d = new Date(tvPassagemData+'T00:00:00');
+  d.setDate(d.getDate()+delta);
+  tvPassagemData = d.toISOString().slice(0,10);
+  renderTv();
+}
+function tvPassagemHoje(){
+  tvPassagemData = todayStr();
+  renderTv();
+}
+function tvPassagemDefinirData(valor){
+  if(valor){ tvPassagemData = valor; renderTv(); }
+}
 
 /* ---------------- PDF ---------------- */
-function gerarPdfDoDia(){
+function gerarPdfDoDia(pessoaFiltro){
   const { jsPDF } = window.jspdf;
   const doc = new jsPDF({orientation:'landscape'});
   const dateStr = todayStr();
@@ -1785,41 +1874,74 @@ function gerarPdfDoDia(){
   doc.text('GESTAMP TAUBATÉ', 10, 10.5);
   doc.setFontSize(10);
   doc.setFont(undefined,'normal');
-  doc.text('Passagem de Turno — PCP/CS — '+dateBr, 297-10, 10.5, {align:'right'});
+  const tituloDireita = pessoaFiltro
+    ? ('Passagem de Turno — PCP/CS — '+pessoaFiltro+' — '+dateBr)
+    : ('Passagem de Turno — PCP/CS — '+dateBr);
+  doc.text(tituloDireita, 297-10, 10.5, {align:'right'});
 
   let y = 24;
-  const nota = state.notas.find(n=>n.data===dateStr);
   doc.setTextColor(30,30,30);
-  doc.setFontSize(11);
-  doc.setFont(undefined,'bold');
-  doc.text('INF. da Reunião das 10h00', 10, y);
-  doc.setFont(undefined,'normal');
-  doc.setFontSize(9.5);
-  const notaTexto = nota && nota.texto ? nota.texto : '(sem registro)';
-  const notaLines = doc.splitTextToSize(notaTexto, 277);
-  doc.text(notaLines, 10, y+6);
-  y += 6 + notaLines.length*4.2 + 6;
 
-  const rowsDiaria = tasksInRange('diaria', dateStr, dateStr, '').map(t=>[
-    t.pessoa, t.categoria, t.descricao + (t.distribuicao ? ('\nDistribuição: '+t.distribuicao) : ''),
-    t.turno_abertura+' · '+t.aberto_por,
-    t.prazo_fechamento ? fmtDateTime(t.prazo_fechamento) : '—',
-    t.status==='fechada' ? (t.turno_fechamento+' · '+t.fechado_por) : '—',
-    (t.andamento||0)+'%',
-    t.status==='aberta' ? 'ABERTA' : ('FECHADA (por '+(t.fechado_por||'?')+')'),
-    t.observacao_fechamento || ''
-  ]);
+  // Nota da reunião e Passagem de Turno só entram no relatório geral
+  // (quando é o PDF de uma pessoa só, vai direto pras tarefas dela).
+  if(!pessoaFiltro){
+    const nota = state.notas.find(n=>n.data===dateStr);
+    doc.setFontSize(11);
+    doc.setFont(undefined,'bold');
+    doc.text('INF. da Reunião das 10h00', 10, y);
+    doc.setFont(undefined,'normal');
+    doc.setFontSize(9.5);
+    const notaTexto = nota && nota.texto ? nota.texto : '(sem registro)';
+    const notaLines = doc.splitTextToSize(notaTexto, 277);
+    doc.text(notaLines, 10, y+6);
+    y += 6 + notaLines.length*4.2 + 8;
+
+    const passagem = state.passagens.find(p=>p.data===dateStr);
+    doc.setFontSize(11);
+    doc.setFont(undefined,'bold');
+    doc.text('Passagem de Turno', 10, y);
+    doc.setFont(undefined,'normal');
+    doc.setFontSize(9.5);
+    const passagemTexto = passagem && passagem.texto ? passagem.texto : '(sem registro)';
+    const passagemLines = doc.splitTextToSize(passagemTexto, 277);
+    doc.text(passagemLines, 10, y+6);
+    y += 6 + passagemLines.length*4.2 + 8;
+  }else{
+    doc.setFontSize(10.5);
+    doc.setFont(undefined,'normal');
+    doc.text('Relatório individual gerado em '+fmtDateTime(nowIso()), 10, y);
+    y += 8;
+  }
+
+  const rowsDiaria = tasksInRange('diaria', dateStr, dateStr, '')
+    .filter(t=> !pessoaFiltro || t.pessoa===pessoaFiltro)
+    .map(t=>[
+      t.pessoa, t.categoria, t.descricao + (t.distribuicao ? ('\nDistribuição: '+t.distribuicao) : ''),
+      t.turno_abertura+' · '+t.aberto_por,
+      t.prazo_fechamento ? fmtDateTime(t.prazo_fechamento) : '—',
+      t.status==='fechada' ? (t.turno_fechamento+' · '+t.fechado_por) : '—',
+      (t.andamento||0)+'%',
+      t.status==='aberta' ? 'ABERTA' : ('FECHADA (por '+(t.fechado_por||'?')+')'),
+      t.observacao_fechamento || ''
+    ]);
   doc.autoTable({
     startY: y,
     head: [['Pessoa','Categoria','Descrição','Abertura','Prazo','Fechamento','Andamento','Status','Observação']],
-    body: rowsDiaria.length ? rowsDiaria : [['—','—','Nenhuma tarefa registrada hoje','—','—','—','—','—','—']],
+    body: rowsDiaria.length ? rowsDiaria : [['—','—','Nenhuma tarefa registrada hoje'+(pessoaFiltro?' para '+pessoaFiltro:'')+'.','—','—','—','—','—','—']],
     styles:{fontSize:8, cellPadding:2.2},
     headStyles:{fillColor:[0,48,135], textColor:255},
     theme:'grid'
   });
 
-  doc.save('Passagem_Turno_PCP_CS_'+dateStr+'.pdf');
-  toast('PDF gerado.');
+  const nomeArquivo = pessoaFiltro
+    ? ('Passagem_Turno_PCP_CS_'+pessoaFiltro.replace(/\s+/g,'_')+'_'+dateStr+'.pdf')
+    : ('Passagem_Turno_PCP_CS_'+dateStr+'.pdf');
+  doc.save(nomeArquivo);
+  toast(pessoaFiltro ? ('PDF de '+pessoaFiltro+' gerado.') : 'PDF gerado.');
+}
+
+function gerarPdfPessoa(pessoa){
+  gerarPdfDoDia(pessoa);
 }
 
 /* ---------------- Eventos ---------------- */
@@ -1872,7 +1994,7 @@ function bindEvents(){
     syncNow(true);
   });
   document.getElementById('btnSyncNow').addEventListener('click', ()=>syncNow(true));
-  document.getElementById('btnPdf').addEventListener('click', gerarPdfDoDia);
+  document.getElementById('btnPdf').addEventListener('click', ()=>gerarPdfDoDia());
 
   document.querySelectorAll('[data-close]').forEach(b=>b.addEventListener('click', ()=>hideModal(b.dataset.close)));
   document.getElementById('btnSalvarTarefa').addEventListener('click', confirmarNovaTarefa);
@@ -1909,6 +2031,29 @@ function bindEvents(){
     saveLocal();
   });
 
+  document.getElementById('btnSalvarPassagem').addEventListener('click', ()=>{
+    const texto = document.getElementById('passagemTexto').value.trim();
+    const preenchidoPor = document.getElementById('passagemPreenchidoPor').value.trim();
+    const dataPassagem = document.getElementById('passagemData').value || todayStr();
+    if(!preenchidoPor){ toast('Preencha "Preenchido por" antes de salvar a passagem.'); return; }
+    state.ultimoPreenchidoPor = preenchidoPor;
+    addSugestao('supervisores', preenchidoPor);
+    let p = state.passagens.find(x=>x.data===dataPassagem);
+    if(!p){ p = {data: dataPassagem}; state.passagens.push(p); }
+    p.texto = texto;
+    p.atualizado_por = preenchidoPor;
+    p.updated_at = nowIso();
+    state.rascunhoPassagem = { data: '', texto: '' };
+    pushPassagem(p);
+    toast('Passagem de turno salva ('+new Date(dataPassagem+'T00:00:00').toLocaleDateString('pt-BR')+').');
+  });
+  document.getElementById('passagemData').addEventListener('change', renderPassagem);
+  document.getElementById('passagemTexto').addEventListener('input', e=>{
+    const dataAtual = document.getElementById('passagemData').value || todayStr();
+    state.rascunhoPassagem = { data: dataAtual, texto: e.target.value };
+    saveLocal();
+  });
+
   document.getElementById('histDeDiaria').addEventListener('change', ()=>renderHistory('diaria'));
   document.getElementById('histAteDiaria').addEventListener('change', ()=>renderHistory('diaria'));
   document.getElementById('histBuscaDiaria').addEventListener('input', ()=>renderHistory('diaria'));
@@ -1926,6 +2071,10 @@ function bindEvents(){
   document.getElementById('btnTvNotaNext').addEventListener('click', ()=>tvNotaMudarDia(1));
   document.getElementById('btnTvNotaHoje').addEventListener('click', tvNotaHoje);
   document.getElementById('tvNotaDataInput').addEventListener('change', e=>tvNotaDefinirData(e.target.value));
+  document.getElementById('btnTvPassagemPrev').addEventListener('click', ()=>tvPassagemMudarDia(-1));
+  document.getElementById('btnTvPassagemNext').addEventListener('click', ()=>tvPassagemMudarDia(1));
+  document.getElementById('btnTvPassagemHoje').addEventListener('click', tvPassagemHoje);
+  document.getElementById('tvPassagemDataInput').addEventListener('change', e=>tvPassagemDefinirData(e.target.value));
   document.addEventListener('keydown', e=>{ if(e.key==='Escape') exitTv(); });
 }
 
@@ -1936,7 +2085,8 @@ window.PT = {
   tvSelectPerson: tvSelectPerson,
   editarHistorico: openEditModal,
   removerPessoa: removerPessoa,
-  atualizarAndamento: atualizarAndamento
+  atualizarAndamento: atualizarAndamento,
+  gerarPdfPessoa: gerarPdfPessoa
 };
 
 /* ---------------- Init ---------------- */
