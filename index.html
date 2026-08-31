@@ -662,6 +662,7 @@ textarea{resize:vertical;}
   <div class="nav">
     <button class="active" data-tab="dash" onclick="switchTab('dash')">📊 Dashboard</button>
     <button data-tab="charts" onclick="switchTab('charts')">📈 Gráficos</button>
+    <button data-tab="ocorrencias" onclick="switchTab('ocorrencias')">🚦 Ocorrências</button>
     <button data-tab="form" onclick="goToNewForm()">📝 Novo Relatório</button>
   </div>
 </div>
@@ -828,6 +829,80 @@ textarea{resize:vertical;}
           <div id="pie-legend"></div>
         </div>
       </div>
+    </div>
+  </div>
+
+  <!-- OCORRÊNCIAS -->
+  <div id="tab-ocorrencias" class="hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+      <div class="section-title" style="margin:0;">🚦 Análise de Ocorrências</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-small" onclick="clearOcFilters()">🔄 Limpar filtros</button>
+        <button class="btn btn-primary btn-small" onclick="exportOcorrenciasExcel()">📥 Exportar Excel</button>
+      </div>
+    </div>
+    <!-- Filtros -->
+    <div class="card" style="margin-bottom:14px;padding:12px;">
+      <div class="row" style="gap:10px;flex-wrap:wrap;">
+        <div class="col"><input type="text" id="oc-search" placeholder="🔍 Buscar cliente, problema..." oninput="renderOcorrencias()" style="min-width:180px;"></div>
+        <div class="col">
+          <select id="oc-resp" onchange="renderOcorrencias()">
+            <option value="">Todas as responsabilidades</option>
+            <option>Cliente</option><option>Operação</option><option>Logística</option>
+            <option>Fornecedor</option><option>SEFAZ/Fiscal</option><option>Outro</option>
+          </select>
+        </div>
+        <div class="col">
+          <select id="oc-motivo" onchange="renderOcorrencias()">
+            <option value="">Todos os motivos</option>
+            <option>Atraso no carregamento</option><option>Problema fiscal/SEFAZ</option>
+            <option>Avaria de produto</option><option>Falta de veículo</option>
+            <option>Divergência de documento</option><option>Problema de sistema</option>
+            <option>Falta de mão de obra</option><option>Carga recusada pelo cliente</option>
+            <option>Janela de recebimento encerrada</option><option>Outro</option>
+          </select>
+        </div>
+        <div class="col-narrow"><div class="label">De</div><input type="date" id="oc-start" onchange="renderOcorrencias()"></div>
+        <div class="col-narrow"><div class="label">Até</div><input type="date" id="oc-end" onchange="renderOcorrencias()"></div>
+      </div>
+    </div>
+    <!-- Cards de resumo -->
+    <div class="row" id="oc-summary" style="margin-bottom:14px;"></div>
+    <!-- Gráficos -->
+    <div class="row" style="margin-bottom:14px;gap:14px;">
+      <div class="col">
+        <div class="card">
+          <div class="label" style="margin-bottom:8px;">NOK por Responsabilidade</div>
+          <div style="height:200px;"><canvas id="chart-oc-resp"></canvas></div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card">
+          <div class="label" style="margin-bottom:8px;">NOK por Motivo</div>
+          <div style="height:200px;"><canvas id="chart-oc-motivo"></canvas></div>
+        </div>
+      </div>
+    </div>
+    <!-- Tabela -->
+    <div class="card" style="padding:0;overflow:auto;">
+      <div id="oc-empty" class="empty hidden"><div class="big">🚦</div><div style="margin-top:8px;">Nenhuma ocorrência para os filtros selecionados.</div></div>
+      <table id="oc-table" style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:2px solid var(--border);">
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;white-space:nowrap;">Data</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;">Turno</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;">Cliente</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;">Status</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;">Responsab.</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;">Motivo</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;">Problema</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;">Comentários</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;white-space:nowrap;">H. Prev.</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;white-space:nowrap;">H. Real</th>
+          </tr>
+        </thead>
+        <tbody id="oc-tbody"></tbody>
+      </table>
     </div>
   </div>
 
@@ -1399,6 +1474,7 @@ function switchTab(id){
   if(navBtn) navBtn.classList.add("active");
   if(id==="charts") renderCharts();
   if(id==="form") renderForm();
+  if(id==="ocorrencias") renderOcorrencias();
 }
 
 // ============ DASHBOARD ============
@@ -1587,14 +1663,15 @@ function renderCargas(){
   form.cargas.forEach((cg,i)=>{
     const div = document.createElement("div");
     div.className = "carga-block";
+    const isNok = cg.status==="NOK";
     div.innerHTML = `
       <div class="carga-header">
         <span class="carga-label">Carga ${i+1}</span>
-        <span class="badge badge-${cg.status==='NOK'?'NOK':'OK'}" style="margin-left:8px;">${cg.status==='NOK'?'NOK':'OK'}</span>
+        <span class="badge badge-${isNok?'NOK':'OK'}" style="margin-left:8px;">${isNok?'NOK':'OK'}</span>
         <div style="margin-left:auto;display:flex;gap:8px;align-items:center;">
           <select style="width:auto;padding:5px 10px;font-size:12px;font-weight:700;" onchange="updateCarga(${i},'status',this.value)">
-            <option value="OK" ${cg.status!=='NOK'?'selected':''}>OK</option>
-            <option value="NOK" ${cg.status==='NOK'?'selected':''}>NOK</option>
+            <option value="OK" ${!isNok?'selected':''}>OK</option>
+            <option value="NOK" ${isNok?'selected':''}>NOK</option>
           </select>
           ${form.cargas.length>1 ? `<button class="btn btn-danger btn-small" onclick="removeCarga(${i})">✕ Remover</button>` : ""}
         </div>
@@ -1615,8 +1692,36 @@ function renderCargas(){
         <div class="col"><div class="label">H. Real</div><input value="${esc(cg.horario_real)}" placeholder="17h17" oninput="updateCarga(${i},'horario_real',this.value)"></div>
       </div>
       <div class="row">
-        <div class="col"><div class="label">Problema</div><input value="${esc(cg.problema)}" placeholder="SEFAZ, atraso..." oninput="updateCarga(${i},'problema',this.value)"></div>
-        <div class="col"><div class="label">Obs</div><input value="${esc(cg.obs)}" placeholder="Saída às 01h58..." oninput="updateCarga(${i},'obs',this.value)"></div>
+        <div class="col"><div class="label">Responsabilidade</div>
+          <select onchange="updateCarga(${i},'responsabilidade',this.value)">
+            <option value="" ${!cg.responsabilidade?'selected':''}>— Selecionar —</option>
+            <option value="Cliente" ${cg.responsabilidade==='Cliente'?'selected':''}>Cliente</option>
+            <option value="Operação" ${cg.responsabilidade==='Operação'?'selected':''}>Operação</option>
+            <option value="Logística" ${cg.responsabilidade==='Logística'?'selected':''}>Logística</option>
+            <option value="Fornecedor" ${cg.responsabilidade==='Fornecedor'?'selected':''}>Fornecedor</option>
+            <option value="SEFAZ/Fiscal" ${cg.responsabilidade==='SEFAZ/Fiscal'?'selected':''}>SEFAZ/Fiscal</option>
+            <option value="Outro" ${cg.responsabilidade==='Outro'?'selected':''}>Outro</option>
+          </select>
+        </div>
+        <div class="col"><div class="label">Motivo da Ocorrência</div>
+          <select onchange="updateCarga(${i},'motivo',this.value)">
+            <option value="" ${!cg.motivo?'selected':''}>— Selecionar —</option>
+            <option value="Atraso no carregamento" ${cg.motivo==='Atraso no carregamento'?'selected':''}>Atraso no carregamento</option>
+            <option value="Problema fiscal/SEFAZ" ${cg.motivo==='Problema fiscal/SEFAZ'?'selected':''}>Problema fiscal/SEFAZ</option>
+            <option value="Avaria de produto" ${cg.motivo==='Avaria de produto'?'selected':''}>Avaria de produto</option>
+            <option value="Falta de veículo" ${cg.motivo==='Falta de veículo'?'selected':''}>Falta de veículo</option>
+            <option value="Divergência de documento" ${cg.motivo==='Divergência de documento'?'selected':''}>Divergência de documento</option>
+            <option value="Problema de sistema" ${cg.motivo==='Problema de sistema'?'selected':''}>Problema de sistema</option>
+            <option value="Falta de mão de obra" ${cg.motivo==='Falta de mão de obra'?'selected':''}>Falta de mão de obra</option>
+            <option value="Carga recusada pelo cliente" ${cg.motivo==='Carga recusada pelo cliente'?'selected':''}>Carga recusada pelo cliente</option>
+            <option value="Janela de recebimento encerrada" ${cg.motivo==='Janela de recebimento encerrada'?'selected':''}>Janela de recebimento encerrada</option>
+            <option value="Outro" ${cg.motivo==='Outro'?'selected':''}>Outro</option>
+          </select>
+        </div>
+      </div>
+      <div class="row">
+        <div class="col"><div class="label">Problema / Detalhe</div><input value="${esc(cg.problema)}" placeholder="SEFAZ, atraso..." oninput="updateCarga(${i},'problema',this.value)"></div>
+        <div class="col"><div class="label">Comentários Complementares</div><input value="${esc(cg.obs)}" placeholder="Saída às 01h58..." oninput="updateCarga(${i},'obs',this.value)"></div>
       </div>
     `;
     c.appendChild(div);
@@ -1626,7 +1731,7 @@ function renderCargas(){
   document.addEventListener('click', acOutsideClick);
 }
 function updateCarga(i,key,val){ form.cargas[i][key] = val; if(key==='status'){ renderCargas(); updateExpedicaoAuto(); } }
-function addCarga(){ form.cargas.push({cliente:"",horario_prev:"",horario_real:"",problema:"",obs:"",status:"OK"}); renderCargas(); updateExpedicaoAuto(); }
+function addCarga(){ form.cargas.push({cliente:"",horario_prev:"",horario_real:"",problema:"",obs:"",status:"OK",responsabilidade:"",motivo:""}); renderCargas(); updateExpedicaoAuto(); }
 function removeCarga(i){ form.cargas.splice(i,1); renderCargas(); updateExpedicaoAuto(); }
 
 // ============ CLIENTES (autocomplete com busca) ============
@@ -2456,6 +2561,8 @@ function renderDetail(){
       const late = c.horario_real > c.horario_prev;
       html += `<span style="color:${late?'var(--red)':'var(--green)'};"> → Real: ${esc(c.horario_real)}</span>`;
     }
+    if(c.responsabilidade) html += `<span style="margin-left:6px;font-size:11px;padding:2px 7px;border-radius:99px;background:var(--blue);color:#fff;font-weight:600;">${esc(c.responsabilidade)}</span>`;
+    if(c.motivo) html += `<span style="color:var(--muted);font-size:12px;margin-left:6px;">📋 ${esc(c.motivo)}</span>`;
     if(c.problema) html += `<span style="color:var(--red);"> ⚠ ${esc(c.problema)}</span>`;
     if(c.obs) html += `<span style="color:var(--muted);"> — ${esc(c.obs)}</span>`;
     html += `</div>`;
@@ -3354,6 +3461,8 @@ function exportExcel(){
           "Carga Cliente": c.cliente || "",
           "Carga H Previsto": c.horario_prev || "",
           "Carga H Real": c.horario_real || "",
+          "Carga Responsabilidade": c.responsabilidade || "",
+          "Carga Motivo": c.motivo || "",
           "Carga Problema": c.problema || "",
           "Carga Obs": c.obs || "",
           "Carga Status": c.status || "OK"
@@ -3728,6 +3837,177 @@ function renderAlertState(){
 document.getElementById("alert-modal-overlay").addEventListener("click", function(e){
   if(e.target === this) closeAlertModal();
 });
+
+// ============ OCORRÊNCIAS ============
+let ocCharts = {};
+
+function getAllOcorrencias(){
+  const out = [];
+  reports.forEach(r=>{
+    (r.cargas||[]).forEach(c=>{
+      out.push({
+        data: r.data, turno: r.turno, supervisor: r.supervisor,
+        cliente: c.cliente||"", status: c.status||"OK",
+        responsabilidade: c.responsabilidade||"", motivo: c.motivo||"",
+        problema: c.problema||"", obs: c.obs||"",
+        horario_prev: c.horario_prev||"", horario_real: c.horario_real||"",
+        _rid: r.id
+      });
+    });
+  });
+  return out;
+}
+
+function getFilteredOcorrencias(){
+  const term = (document.getElementById("oc-search")||{}).value?.trim().toLowerCase()||"";
+  const resp = (document.getElementById("oc-resp")||{}).value||"";
+  const motivo = (document.getElementById("oc-motivo")||{}).value||"";
+  const start = (document.getElementById("oc-start")||{}).value||"";
+  const end = (document.getElementById("oc-end")||{}).value||"";
+  return getAllOcorrencias().filter(o=>{
+    if(resp && o.responsabilidade !== resp) return false;
+    if(motivo && o.motivo !== motivo) return false;
+    if(start && o.data < start) return false;
+    if(end && o.data > end) return false;
+    if(term){
+      const h = [o.cliente,o.responsabilidade,o.motivo,o.problema,o.obs,o.turno,o.supervisor].join(" ").toLowerCase();
+      if(!h.includes(term)) return false;
+    }
+    return true;
+  });
+}
+
+function renderOcorrencias(){
+  if(document.getElementById("tab-ocorrencias").classList.contains("hidden")) return;
+
+  // destroy old charts
+  ["oc-resp","oc-motivo"].forEach(k=>{ if(ocCharts[k]){ ocCharts[k].destroy(); delete ocCharts[k]; }});
+
+  const all = getFilteredOcorrencias();
+  const nok = all.filter(o=>o.status==="NOK");
+
+  // Summary cards
+  const totalCargas = all.length;
+  const totalNok = nok.length;
+  const comMotivo = nok.filter(o=>o.motivo).length;
+  const comResp = nok.filter(o=>o.responsabilidade).length;
+  document.getElementById("oc-summary").innerHTML = [
+    {label:"Total de cargas", val:totalCargas, color:"var(--blue)"},
+    {label:"Cargas NOK", val:totalNok, color:"var(--red)"},
+    {label:"Com motivo registrado", val:comMotivo, color:"var(--amber)"},
+    {label:"Com responsabilidade", val:comResp, color:"var(--green)"},
+  ].map(s=>`
+    <div class="col">
+      <div class="card stat-card" style="text-align:center;padding:12px;">
+        <div style="font-size:22px;font-weight:800;color:${s.color};">${s.val}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${s.label}</div>
+      </div>
+    </div>`).join("");
+
+  const C = {blue:"#3B7BE8", green:"#0E9F6E", amber:"#D97706", red:"#E02020", muted:"#6B7C93", border:"#D1DCE8"};
+  const gridOpt = {grid:{color:C.border}, ticks:{color:C.muted, font:{size:11}}};
+
+  // Chart: por Responsabilidade (apenas NOK)
+  const respCount = {};
+  nok.forEach(o=>{ const k=o.responsabilidade||"Não informado"; respCount[k]=(respCount[k]||0)+1; });
+  const respLabels = Object.keys(respCount).sort((a,b)=>respCount[b]-respCount[a]);
+  const respColors = {
+    "Cliente":C.amber, "Operação":C.blue, "Logística":C.green,
+    "Fornecedor":"#7C3AED", "SEFAZ/Fiscal":C.red, "Outro":C.muted, "Não informado":"#9CA3AF"
+  };
+  if(respLabels.length > 0){
+    ocCharts["oc-resp"] = new Chart(document.getElementById("chart-oc-resp"),{
+      type:"bar",
+      data:{labels:respLabels, datasets:[{
+        data:respLabels.map(l=>respCount[l]),
+        backgroundColor:respLabels.map(l=>respColors[l]||C.muted),
+        borderRadius:5
+      }]},
+      options:{responsive:true, maintainAspectRatio:false,
+        indexAxis:"y",
+        scales:{x:gridOpt, y:{...gridOpt, ticks:{...gridOpt.ticks, font:{size:12}}}},
+        plugins:{legend:{display:false}}}
+    });
+  }
+
+  // Chart: por Motivo (apenas NOK)
+  const motCount = {};
+  nok.forEach(o=>{ const k=o.motivo||"Não informado"; motCount[k]=(motCount[k]||0)+1; });
+  const motLabels = Object.keys(motCount).sort((a,b)=>motCount[b]-motCount[a]);
+  const palette = ["#3B7BE8","#E02020","#D97706","#0E9F6E","#7C3AED","#EC4899","#06B6D4","#84CC16","#F97316","#6B7C93"];
+  if(motLabels.length > 0){
+    ocCharts["oc-motivo"] = new Chart(document.getElementById("chart-oc-motivo"),{
+      type:"bar",
+      data:{labels:motLabels, datasets:[{
+        data:motLabels.map(l=>motCount[l]),
+        backgroundColor:motLabels.map((_,i)=>palette[i%palette.length]),
+        borderRadius:5
+      }]},
+      options:{responsive:true, maintainAspectRatio:false,
+        indexAxis:"y",
+        scales:{x:gridOpt, y:{...gridOpt, ticks:{...gridOpt.ticks, font:{size:12}}}},
+        plugins:{legend:{display:false}}}
+    });
+  }
+
+  // Table
+  const tbody = document.getElementById("oc-tbody");
+  const emptyEl = document.getElementById("oc-empty");
+  const tableEl = document.getElementById("oc-table");
+  if(all.length===0){
+    tbody.innerHTML=""; tableEl.style.display="none"; emptyEl.classList.remove("hidden");
+    return;
+  }
+  tableEl.style.display=""; emptyEl.classList.add("hidden");
+  const sorted = [...all].sort((a,b)=>b.data.localeCompare(a.data)||(b.turno.localeCompare(a.turno)));
+  tbody.innerHTML = sorted.map((o,idx)=>{
+    const rowBg = idx%2===0?"":"background:var(--bg);";
+    const statusBadge = `<span class="badge badge-${o.status}" style="font-size:11px;">${o.status}</span>`;
+    const respBadge = o.responsabilidade
+      ? `<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:var(--blue);color:#fff;font-weight:600;">${esc(o.responsabilidade)}</span>`
+      : `<span style="color:var(--muted);font-size:11px;">—</span>`;
+    return `<tr style="${rowBg}">
+      <td style="padding:7px 10px;white-space:nowrap;border-bottom:1px solid var(--border);">${esc(o.data)}</td>
+      <td style="padding:7px 10px;white-space:nowrap;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);">${esc(o.turno.split(" ")[0])}</td>
+      <td style="padding:7px 10px;font-weight:600;border-bottom:1px solid var(--border);">${esc(o.cliente||"—")}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--border);">${statusBadge}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--border);">${respBadge}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;">${esc(o.motivo||"—")}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;color:${o.problema?'var(--red)':'var(--muted)'};">${esc(o.problema||"—")}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;">${esc(o.obs||"—")}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap;">${esc(o.horario_prev||"—")}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--border);white-space:nowrap;color:${o.horario_real>o.horario_prev?'var(--red)':'inherit'};">${esc(o.horario_real||"—")}</td>
+    </tr>`;
+  }).join("");
+}
+
+function clearOcFilters(){
+  ["oc-search","oc-start","oc-end"].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=""; });
+  ["oc-resp","oc-motivo"].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=""; });
+  renderOcorrencias();
+}
+
+function exportOcorrenciasExcel(){
+  const all = getFilteredOcorrencias();
+  if(all.length===0){ showToast("⚠️ Nenhuma ocorrência para exportar"); return; }
+  try{
+    const rows = all.map(o=>({
+      "Data": o.data, "Turno": o.turno, "Supervisor": o.supervisor,
+      "Cliente": o.cliente, "Status Carga": o.status,
+      "Responsabilidade": o.responsabilidade||"",
+      "Motivo": o.motivo||"",
+      "Problema / Detalhe": o.problema,
+      "Comentários": o.obs,
+      "H. Previsto": o.horario_prev,
+      "H. Real": o.horario_real
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Ocorrencias");
+    XLSX.writeFile(wb, `ocorrencias_${new Date().toISOString().slice(0,10)}.xlsx`);
+    showToast("📥 Excel de ocorrências exportado!");
+  }catch(e){ showToast("❌ Erro ao exportar: "+(e.message||"erro")); }
+}
 
 // ============ INIT ============
 document.getElementById("f-data").value = new Date().toISOString().slice(0,10);
