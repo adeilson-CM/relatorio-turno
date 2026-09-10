@@ -663,6 +663,7 @@ textarea{resize:vertical;}
     <button class="active" data-tab="dash" onclick="switchTab('dash')">📊 Dashboard</button>
     <button data-tab="charts" onclick="switchTab('charts')">📈 Gráficos</button>
     <button data-tab="ocorrencias" onclick="switchTab('ocorrencias')">🚦 Ocorrências</button>
+    <button data-tab="sistemas" onclick="switchTab('sistemas')">🖥️ Sistemas</button>
     <button data-tab="form" onclick="goToNewForm()">📝 Novo Relatório</button>
   </div>
 </div>
@@ -902,6 +903,94 @@ textarea{resize:vertical;}
           </tr>
         </thead>
         <tbody id="oc-tbody"></tbody>
+      </table>
+    </div>
+  </div>
+
+  <!-- SISTEMAS (G-Req / G-Prod) -->
+  <div id="tab-sistemas" class="hidden">
+    <div style="display:flex;align-items:center;justify-content:space-between;flex-wrap:wrap;gap:10px;margin-bottom:14px;">
+      <div class="section-title" style="margin:0;">🖥️ Dashboard de Problemas — G-Req / G-Prod</div>
+      <div style="display:flex;gap:8px;flex-wrap:wrap;">
+        <button class="btn btn-ghost btn-small" onclick="clearSisFilters()">🔄 Limpar filtros</button>
+        <button class="btn btn-primary btn-small" onclick="exportSistemasExcel()">📥 Exportar Excel</button>
+      </div>
+    </div>
+    <!-- Filtros -->
+    <div class="card" style="margin-bottom:14px;padding:12px;">
+      <div class="row" style="gap:10px;flex-wrap:wrap;">
+        <div class="col"><input type="text" id="sis-search" placeholder="🔍 Buscar motivo, supervisor, turno..." oninput="renderSistemas_v2()" style="min-width:180px;"></div>
+        <div class="col">
+          <select id="sis-sistema" onchange="renderSistemas_v2()">
+            <option value="">Todos os sistemas</option>
+            <option value="greq">G-Req</option>
+            <option value="gprod">G-Prod</option>
+          </select>
+        </div>
+        <div class="col">
+          <select id="sis-turno" onchange="renderSistemas_v2()">
+            <option value="">Todos os turnos</option>
+            <option>Diurno (06h-18h)</option>
+            <option>Noturno (18h-06h)</option>
+            <option>Turno 1</option>
+            <option>Turno 2</option>
+            <option>Turno 3</option>
+          </select>
+        </div>
+        <div class="col-narrow"><div class="label">De</div><input type="date" id="sis-start" onchange="renderSistemas_v2()"></div>
+        <div class="col-narrow"><div class="label">Até</div><input type="date" id="sis-end" onchange="renderSistemas_v2()"></div>
+      </div>
+    </div>
+    <!-- Cards de resumo -->
+    <div class="row" id="sis-summary" style="margin-bottom:14px;"></div>
+    <!-- Gráficos -->
+    <div class="row" style="margin-bottom:14px;gap:14px;">
+      <div class="col">
+        <div class="card">
+          <div class="label" style="margin-bottom:8px;">📈 Evolução de Problemas NOK por Relatório</div>
+          <div style="height:280px;"><canvas id="chart-sis-evolucao"></canvas></div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card">
+          <div class="label" style="margin-bottom:8px;">🍕 Distribuição NOK — G-Req x G-Prod</div>
+          <div class="pie-flex">
+            <div class="chart-wrap-sm" style="width:55%;"><canvas id="chart-sis-pie"></canvas></div>
+            <div id="sis-pie-legend"></div>
+          </div>
+        </div>
+      </div>
+    </div>
+    <div class="row" style="margin-bottom:14px;gap:14px;">
+      <div class="col">
+        <div class="card">
+          <div class="label" style="margin-bottom:8px;">🕒 NOK por Turno</div>
+          <div style="height:220px;"><canvas id="chart-sis-turno"></canvas></div>
+        </div>
+      </div>
+      <div class="col">
+        <div class="card">
+          <div class="label" style="margin-bottom:8px;">👤 NOK por Supervisor</div>
+          <div style="height:220px;"><canvas id="chart-sis-supervisor"></canvas></div>
+        </div>
+      </div>
+    </div>
+    <!-- Tabela detalhada -->
+    <div class="card" style="padding:0;overflow:auto;">
+      <div id="sis-empty" class="empty hidden"><div class="big">🖥️</div><div style="margin-top:8px;">Nenhum problema de sistema registrado para os filtros selecionados.</div></div>
+      <table id="sis-table" style="width:100%;border-collapse:collapse;font-size:12px;">
+        <thead>
+          <tr style="background:var(--bg);border-bottom:2px solid var(--border);">
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;white-space:nowrap;">Data</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;">Turno</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;">Sistema</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;">Status</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;">Supervisor</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;">Preenchido por</th>
+            <th style="padding:8px 10px;text-align:left;font-weight:700;font-size:11px;">Motivo / Descrição</th>
+          </tr>
+        </thead>
+        <tbody id="sis-tbody"></tbody>
       </table>
     </div>
   </div>
@@ -1475,6 +1564,7 @@ function switchTab(id){
   if(id==="charts") renderCharts();
   if(id==="form") renderForm();
   if(id==="ocorrencias") renderOcorrencias();
+  if(id==="sistemas") renderSistemas_v2();
 }
 
 // ============ DASHBOARD ============
@@ -2919,6 +3009,95 @@ function destroyCharts(){
   Object.values(chartInstances).forEach(c=>c && c.destroy());
   chartInstances = {};
 }
+
+// Plugin global de rótulos de valor (funciona em bar/line/pie) — extraído para
+// função própria para garantir que esteja ativo mesmo antes de abrir a aba Gráficos.
+function registerBarValueLabelsPlugin(){
+  if(!window.Chart || window.__barValueLabelsRegistered) return;
+  Chart.defaults.font.family = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
+  Chart.defaults.font.size = 12;
+  Chart.defaults.color = "#42536B";
+  Chart.defaults.plugins.tooltip.padding = 10;
+  Chart.defaults.plugins.tooltip.titleFont = {size:13, weight:"700"};
+  Chart.defaults.plugins.tooltip.bodyFont = {size:12};
+  Chart.defaults.plugins.legend.labels.boxWidth = 14;
+  Chart.defaults.plugins.legend.labels.usePointStyle = true;
+
+  Chart.register({
+    id:"barValueLabels",
+    afterDatasetsDraw(chart){
+      const type = chart.config.type;
+      if(type !== "bar" && type !== "line" && type !== "pie") return;
+      const {ctx} = chart;
+
+      if(type === "bar"){
+        const isMinutesChart = chart.canvas && chart.canvas.id === "chart-celulas-tempo";
+        chart.data.datasets.forEach((dataset, dsIndex)=>{
+          const meta = chart.getDatasetMeta(dsIndex);
+          if(meta.hidden) return;
+          meta.data.forEach((bar, index)=>{
+            const value = dataset.data[index];
+            if(!value) return;
+            const text = isMinutesChart ? `${value}min` : `${value}`;
+            const isHorizontal = chart.options.indexAxis === "y";
+            ctx.save();
+            ctx.fillStyle = "#1E2A3A";
+            ctx.font = "700 12px system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
+            if(isHorizontal){
+              ctx.textAlign = "left";
+              ctx.textBaseline = "middle";
+              ctx.fillText(text, bar.x + 8, bar.y);
+            }else{
+              ctx.textAlign = "center";
+              ctx.textBaseline = "bottom";
+              ctx.fillText(text, bar.x, bar.y - 6);
+            }
+            ctx.restore();
+          });
+        });
+      }else if(type === "line"){
+        chart.data.datasets.forEach((dataset, dsIndex)=>{
+          const meta = chart.getDatasetMeta(dsIndex);
+          if(meta.hidden) return;
+          meta.data.forEach((point, index)=>{
+            const value = dataset.data[index];
+            if(value===null || value===undefined) return;
+            ctx.save();
+            ctx.fillStyle = "#1E2A3A";
+            ctx.font = "700 12px system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "bottom";
+            ctx.fillText(`${value}`, point.x, point.y - 8);
+            ctx.restore();
+          });
+        });
+      }else if(type === "pie"){
+        chart.data.datasets.forEach((dataset, dsIndex)=>{
+          const meta = chart.getDatasetMeta(dsIndex);
+          if(meta.hidden) return;
+          meta.data.forEach((arc, index)=>{
+            const value = dataset.data[index];
+            if(!value) return;
+            const {x, y, startAngle, endAngle, innerRadius, outerRadius} = arc.getProps(["x","y","startAngle","endAngle","innerRadius","outerRadius"], true);
+            const midAngle = (startAngle + endAngle) / 2;
+            const radius = (innerRadius + outerRadius) / 2;
+            const labelX = x + Math.cos(midAngle) * radius;
+            const labelY = y + Math.sin(midAngle) * radius;
+            ctx.save();
+            ctx.fillStyle = "#fff";
+            ctx.font = "700 13px system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
+            ctx.textAlign = "center";
+            ctx.textBaseline = "middle";
+            ctx.fillText(`${value}`, labelX, labelY);
+            ctx.restore();
+          });
+        });
+      }
+    }
+  });
+  window.__barValueLabelsRegistered = true;
+}
+
 function clearChartFilters(){
   document.getElementById("filter-start").value = "";
   document.getElementById("filter-end").value = "";
@@ -2989,90 +3168,7 @@ function renderCharts(){
   const labels = sorted.map(r=>r.data.slice(5) + (r.supervisor ? ` (${r.supervisor})` : ""));
 
   if(window.Chart){
-    Chart.defaults.font.family = "system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
-    Chart.defaults.font.size = 12;
-    Chart.defaults.color = "#42536B";
-    Chart.defaults.plugins.tooltip.padding = 10;
-    Chart.defaults.plugins.tooltip.titleFont = {size:13, weight:"700"};
-    Chart.defaults.plugins.tooltip.bodyFont = {size:12};
-    Chart.defaults.plugins.legend.labels.boxWidth = 14;
-    Chart.defaults.plugins.legend.labels.usePointStyle = true;
-
-    if(!window.__barValueLabelsRegistered){
-      Chart.register({
-        id:"barValueLabels",
-        afterDatasetsDraw(chart){
-          const type = chart.config.type;
-          if(type !== "bar" && type !== "line" && type !== "pie") return;
-          const {ctx} = chart;
-
-          if(type === "bar"){
-            const isMinutesChart = chart.canvas && chart.canvas.id === "chart-celulas-tempo";
-            chart.data.datasets.forEach((dataset, dsIndex)=>{
-              const meta = chart.getDatasetMeta(dsIndex);
-              if(meta.hidden) return;
-              meta.data.forEach((bar, index)=>{
-                const value = dataset.data[index];
-                if(!value) return;
-                const text = isMinutesChart ? `${value}min` : `${value}`;
-                const isHorizontal = chart.options.indexAxis === "y";
-                ctx.save();
-                ctx.fillStyle = "#1E2A3A";
-                ctx.font = "600 11px system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
-                if(isHorizontal){
-                  ctx.textAlign = "left";
-                  ctx.textBaseline = "middle";
-                  ctx.fillText(text, bar.x + 6, bar.y);
-                }else{
-                  ctx.textAlign = "center";
-                  ctx.textBaseline = "bottom";
-                  ctx.fillText(text, bar.x, bar.y - 4);
-                }
-                ctx.restore();
-              });
-            });
-          }else if(type === "line"){
-            chart.data.datasets.forEach((dataset, dsIndex)=>{
-              const meta = chart.getDatasetMeta(dsIndex);
-              if(meta.hidden) return;
-              meta.data.forEach((point, index)=>{
-                const value = dataset.data[index];
-                if(value===null || value===undefined) return;
-                ctx.save();
-                ctx.fillStyle = "#1E2A3A";
-                ctx.font = "600 11px system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
-                ctx.textAlign = "center";
-                ctx.textBaseline = "bottom";
-                ctx.fillText(`${value}`, point.x, point.y - 8);
-                ctx.restore();
-              });
-            });
-          }else if(type === "pie"){
-            chart.data.datasets.forEach((dataset, dsIndex)=>{
-              const meta = chart.getDatasetMeta(dsIndex);
-              if(meta.hidden) return;
-              meta.data.forEach((arc, index)=>{
-                const value = dataset.data[index];
-                if(!value) return;
-                const {x, y, startAngle, endAngle, innerRadius, outerRadius} = arc.getProps(["x","y","startAngle","endAngle","innerRadius","outerRadius"], true);
-                const midAngle = (startAngle + endAngle) / 2;
-                const radius = (innerRadius + outerRadius) / 2;
-                const labelX = x + Math.cos(midAngle) * radius;
-                const labelY = y + Math.sin(midAngle) * radius;
-                ctx.save();
-                ctx.fillStyle = "#fff";
-                ctx.font = "700 12px system-ui,-apple-system,Segoe UI,Roboto,sans-serif";
-                ctx.textAlign = "center";
-                ctx.textBaseline = "middle";
-                ctx.fillText(`${value}`, labelX, labelY);
-                ctx.restore();
-              });
-            });
-          }
-        }
-      });
-      window.__barValueLabelsRegistered = true;
-    }
+    registerBarValueLabelsPlugin();
   }
 
   const C = {blue:"#3B7BE8", green:"#0E9F6E", amber:"#D97706", red:"#E02020", muted:"#6B7C93", border:"#D1DCE8"};
@@ -4009,7 +4105,227 @@ function exportOcorrenciasExcel(){
   }catch(e){ showToast("❌ Erro ao exportar: "+(e.message||"erro")); }
 }
 
+// ============ SISTEMAS (G-Req / G-Prod) ============
+let sisCharts = {};
+
+function getAllSistemaProblemas(){
+  const out = [];
+  reports.forEach(r=>{
+    [
+      {key:"greq", label:"G-Req"},
+      {key:"gprod", label:"G-Prod"}
+    ].forEach(sis=>{
+      const status = r[sis.key+"_status"] === "NOK" ? "NOK" : "OK";
+      out.push({
+        data: r.data, turno: r.turno, supervisor: r.supervisor||"",
+        preenchido_por: r.preenchido_por||"",
+        sistema: sis.key, sistemaLabel: sis.label,
+        status, motivo: r[sis.key+"_motivo"]||"",
+        _rid: r.id
+      });
+    });
+  });
+  return out;
+}
+
+function getFilteredSistemaProblemas(){
+  const term = (document.getElementById("sis-search")||{}).value?.trim().toLowerCase()||"";
+  const sistema = (document.getElementById("sis-sistema")||{}).value||"";
+  const turno = (document.getElementById("sis-turno")||{}).value||"";
+  const start = (document.getElementById("sis-start")||{}).value||"";
+  const end = (document.getElementById("sis-end")||{}).value||"";
+  return getAllSistemaProblemas().filter(o=>{
+    if(sistema && o.sistema !== sistema) return false;
+    if(turno && o.turno !== turno) return false;
+    if(start && o.data < start) return false;
+    if(end && o.data > end) return false;
+    if(term){
+      const h = [o.motivo, o.supervisor, o.preenchido_por, o.turno, o.sistemaLabel].join(" ").toLowerCase();
+      if(!h.includes(term)) return false;
+    }
+    return true;
+  });
+}
+
+function clearSisFilters(){
+  ["sis-search","sis-start","sis-end"].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=""; });
+  ["sis-sistema","sis-turno"].forEach(id=>{ const el=document.getElementById(id); if(el) el.value=""; });
+  renderSistemas_v2();
+}
+
+function renderSistemas_v2(){
+  if(document.getElementById("tab-sistemas").classList.contains("hidden")) return;
+
+  // destroy old charts
+  Object.keys(sisCharts).forEach(k=>{ if(sisCharts[k]){ sisCharts[k].destroy(); delete sisCharts[k]; }});
+
+  const all = getFilteredSistemaProblemas();
+  const nok = all.filter(o=>o.status==="NOK");
+  const nokGreq = nok.filter(o=>o.sistema==="greq");
+  const nokGprod = nok.filter(o=>o.sistema==="gprod");
+  const totalRegistros = all.length / 2; // 1 registro por relatório (2 sistemas cada)
+  const disponibilidade = totalRegistros>0 ? Math.round(((all.length - nok.length) / all.length) * 1000)/10 : 100;
+
+  // Cards de resumo
+  const C = {blue:"#3B7BE8", green:"#0E9F6E", amber:"#D97706", red:"#E02020", muted:"#6B7C93", border:"#D1DCE8"};
+  document.getElementById("sis-summary").innerHTML = [
+    {label:"Relatórios no período", val:totalRegistros, color:C.blue},
+    {label:"G-Req NOK", val:nokGreq.length, color:C.red},
+    {label:"G-Prod NOK", val:nokGprod.length, color:C.red},
+    {label:"Disponibilidade", val:disponibilidade+"%", color: disponibilidade>=95 ? C.green : (disponibilidade>=85 ? C.amber : C.red)},
+  ].map(s=>`
+    <div class="col">
+      <div class="card stat-card" style="text-align:center;padding:12px;">
+        <div style="font-size:22px;font-weight:800;color:${s.color};">${s.val}</div>
+        <div style="font-size:11px;color:var(--muted);margin-top:2px;">${s.label}</div>
+      </div>
+    </div>`).join("");
+
+  const gridOpt = {grid:{color:C.border}, ticks:{color:C.muted, font:{size:11}}};
+  registerBarValueLabelsPlugin();
+
+  // Gráfico: Evolução por relatório (data), G-Req x G-Prod — barras agrupadas
+  const byReport = {};
+  reports.forEach(r=>{
+    const filteredHasReport = all.some(o=>o._rid===r.id);
+    if(!filteredHasReport) return;
+    byReport[r.id] = {
+      label: (r.data||"").slice(5).split("-").reverse().join("/"),
+      fullLabel: (r.data||"") + (r.turno ? " — "+r.turno.split(" ")[0] : "") + (r.supervisor ? ` (${r.supervisor})` : ""),
+      data: r.data,
+      greq: r.greq_status === "NOK" ? 1 : 0,
+      gprod: r.gprod_status === "NOK" ? 1 : 0
+    };
+  });
+  const evoSorted = Object.values(byReport).sort((a,b)=>a.data.localeCompare(b.data));
+  if(evoSorted.length > 0){
+    sisCharts.evolucao = new Chart(document.getElementById("chart-sis-evolucao"), {
+      type:"bar",
+      data:{
+        labels: evoSorted.map(e=>e.label),
+        datasets:[
+          {label:"G-Req NOK", data:evoSorted.map(e=>e.greq), backgroundColor:C.blue, borderRadius:4, maxBarThickness:34},
+          {label:"G-Prod NOK", data:evoSorted.map(e=>e.gprod), backgroundColor:C.red, borderRadius:4, maxBarThickness:34}
+        ]
+      },
+      options:{responsive:true, maintainAspectRatio:false,
+        layout:{padding:{top:24}},
+        scales:{
+          x:{...gridOpt, ticks:{...gridOpt.ticks, font:{size:12}, maxRotation:0, minRotation:0, autoSkip:true, autoSkipPadding:14}},
+          y:{...gridOpt, min:0, max:1.35, ticks:{...gridOpt.ticks, stepSize:1, font:{size:12}, callback:v=> v===1?"NOK":(v===0?"OK":"")}}
+        },
+        plugins:{
+          legend:{labels:{font:{size:12}}},
+          tooltip:{mode:"index", intersect:false, callbacks:{
+            title: (items)=> items.length ? evoSorted[items[0].dataIndex].fullLabel : "",
+            label: (item)=> `${item.dataset.label}: ${item.raw===1?"NOK":"OK"}`
+          }}
+        }
+      }
+    });
+  }
+
+  // Gráfico: Pizza NOK G-Req x G-Prod
+  const pieLegend = document.getElementById("sis-pie-legend");
+  if(nok.length > 0){
+    sisCharts.pie = new Chart(document.getElementById("chart-sis-pie"), {
+      type:"pie",
+      data:{labels:["G-Req","G-Prod"], datasets:[{data:[nokGreq.length, nokGprod.length], backgroundColor:[C.blue, C.red]}]},
+      options:{responsive:true, maintainAspectRatio:false, plugins:{legend:{display:false}}}
+    });
+    pieLegend.innerHTML = [
+      {l:"G-Req", v:nokGreq.length, c:C.blue},
+      {l:"G-Prod", v:nokGprod.length, c:C.red}
+    ].map(x=>`<div style="display:flex;align-items:center;gap:6px;font-size:12px;margin-bottom:6px;">
+      <span style="width:10px;height:10px;border-radius:3px;background:${x.c};display:inline-block;"></span>${x.l}: <b>${x.v}</b>
+    </div>`).join("");
+  }else{
+    pieLegend.innerHTML = "";
+  }
+
+  // Gráfico: NOK por turno
+  const turnoCount = {};
+  nok.forEach(o=>{ const k=(o.turno||"Não informado").split(" ")[0]; turnoCount[k]=(turnoCount[k]||0)+1; });
+  const turnoLabels = Object.keys(turnoCount).sort((a,b)=>turnoCount[b]-turnoCount[a]);
+  if(turnoLabels.length > 0){
+    const turnoMax = Math.max(...turnoLabels.map(l=>turnoCount[l]));
+    sisCharts.turno = new Chart(document.getElementById("chart-sis-turno"), {
+      type:"bar",
+      data:{labels:turnoLabels, datasets:[{data:turnoLabels.map(l=>turnoCount[l]), backgroundColor:C.amber, borderRadius:5, maxBarThickness:32}]},
+      options:{responsive:true, maintainAspectRatio:false, indexAxis:"y",
+        layout:{padding:{right:36}},
+        scales:{
+          x:{...gridOpt, beginAtZero:true, suggestedMax: turnoMax + Math.max(1, Math.ceil(turnoMax*0.35)), ticks:{...gridOpt.ticks, stepSize:1, precision:0}},
+          y:{...gridOpt, ticks:{...gridOpt.ticks, font:{size:12}}}
+        },
+        plugins:{legend:{display:false}}}
+    });
+  }
+
+  // Gráfico: NOK por supervisor
+  const supCount = {};
+  nok.forEach(o=>{ const k=o.supervisor||"Não informado"; supCount[k]=(supCount[k]||0)+1; });
+  const supLabels = Object.keys(supCount).sort((a,b)=>supCount[b]-supCount[a]);
+  if(supLabels.length > 0){
+    const supMax = Math.max(...supLabels.map(l=>supCount[l]));
+    sisCharts.supervisor = new Chart(document.getElementById("chart-sis-supervisor"), {
+      type:"bar",
+      data:{labels:supLabels, datasets:[{data:supLabels.map(l=>supCount[l]), backgroundColor:C.green, borderRadius:5, maxBarThickness:32}]},
+      options:{responsive:true, maintainAspectRatio:false, indexAxis:"y",
+        layout:{padding:{right:36}},
+        scales:{
+          x:{...gridOpt, beginAtZero:true, suggestedMax: supMax + Math.max(1, Math.ceil(supMax*0.35)), ticks:{...gridOpt.ticks, stepSize:1, precision:0}},
+          y:{...gridOpt, ticks:{...gridOpt.ticks, font:{size:12}}}
+        },
+        plugins:{legend:{display:false}}}
+    });
+  }
+
+  // Tabela detalhada (apenas NOK, ordenado por data desc)
+  const tbody = document.getElementById("sis-tbody");
+  const emptyEl = document.getElementById("sis-empty");
+  const tableEl = document.getElementById("sis-table");
+  if(nok.length===0){
+    tbody.innerHTML=""; tableEl.style.display="none"; emptyEl.classList.remove("hidden");
+    return;
+  }
+  tableEl.style.display=""; emptyEl.classList.add("hidden");
+  const sortedNok = [...nok].sort((a,b)=>b.data.localeCompare(a.data)||(b.turno||"").localeCompare(a.turno||""));
+  tbody.innerHTML = sortedNok.map((o,idx)=>{
+    const rowBg = idx%2===0?"":"background:var(--bg);";
+    const sisBadge = `<span style="font-size:11px;padding:2px 8px;border-radius:99px;background:${o.sistema==='greq'?C.blue:C.red};color:#fff;font-weight:600;">${esc(o.sistemaLabel)}</span>`;
+    return `<tr style="${rowBg}">
+      <td style="padding:7px 10px;white-space:nowrap;border-bottom:1px solid var(--border);">${esc(o.data)}</td>
+      <td style="padding:7px 10px;white-space:nowrap;border-bottom:1px solid var(--border);font-size:11px;color:var(--muted);">${esc((o.turno||"").split(" ")[0])}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--border);">${sisBadge}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--border);"><span class="badge badge-NOK">NOK</span></td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--border);font-weight:600;">${esc(o.supervisor||"—")}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;color:var(--muted);">${esc(o.preenchido_por||"—")}</td>
+      <td style="padding:7px 10px;border-bottom:1px solid var(--border);font-size:12px;">${esc(o.motivo||"—")}</td>
+    </tr>`;
+  }).join("");
+}
+
+function exportSistemasExcel(){
+  const all = getFilteredSistemaProblemas().filter(o=>o.status==="NOK");
+  if(all.length===0){ showToast("⚠️ Nenhum problema de sistema para exportar"); return; }
+  try{
+    const rows = all.map(o=>({
+      "Data": o.data, "Turno": o.turno, "Sistema": o.sistemaLabel,
+      "Status": o.status, "Supervisor": o.supervisor,
+      "Preenchido por": o.preenchido_por,
+      "Motivo / Descrição": o.motivo
+    }));
+    const ws = XLSX.utils.json_to_sheet(rows);
+    const wb = XLSX.utils.book_new();
+    XLSX.utils.book_append_sheet(wb, ws, "Sistemas");
+    XLSX.writeFile(wb, `problemas_sistemas_${new Date().toISOString().slice(0,10)}.xlsx`);
+    showToast("📥 Excel de problemas de sistema exportado!");
+  }catch(e){ showToast("❌ Erro ao exportar: "+(e.message||"erro")); }
+}
+
 // ============ INIT ============
+registerBarValueLabelsPlugin();
 document.getElementById("f-data").value = new Date().toISOString().slice(0,10);
 loadReports();
 renderAlertState();
